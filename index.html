@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cesium Electron App</title>
+  <!-- CesiumJS CSS -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    html, body, #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    #tlePanel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(42, 42, 42, 0.9);
+      padding: 15px;
+      border-radius: 5px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 1000;
+      max-width: 400px;
+    }
+    #tlePanel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
+    #tleInput {
+      width: 100%;
+      height: 120px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: 1px solid #555;
+      border-radius: 3px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 11px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    #tlePanel button {
+      margin-top: 10px;
+      padding: 8px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    #tlePanel button:hover {
+      background: #45a049;
+    }
+    #tlePanel label {
+      display: block;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+    #useTLE {
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  
+  <!-- TLE 입력 패널 -->
+  <div id="tlePanel">
+    <h3>TLE 입력</h3>
+    <label>
+      <input type="checkbox" id="useTLE"> TLE 사용
+    </label>
+    <textarea id="tleInput" placeholder="TLE 데이터를 입력하세요 (2줄 또는 3줄)&#10;예시:&#10;ISS (ZARYA)&#10;1 25544U 98067A   24123.45678901  .00001234  00000+0  12345-4 0  9999&#10;2 25544  51.6442 123.4567 0001234 234.5678 123.4567 15.12345678901234"></textarea>
+    <button id="applyTLE">TLE 적용</button>
+    <label style="margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
+      <input type="checkbox" id="showSwath"> SAR Swath 표시
+    </label>
+  </div>
+  
+  <!-- Satellite.js 라이브러리 (TLE 파싱 및 SGP4 계산용) -->
+  <script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.2/dist/satellite.min.js"></script>
+  
+  <!-- CesiumJS JavaScript -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Cesium.js"></script>
+  <script type="module">
+    // Cesium ion access token 설정
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZjEzNDA2OC05MTE2LTQ2ODgtOGJiYi05MDFjNzc2ZDg0NDIiLCJpZCI6MjE1NTM4LCJpYXQiOjE3NjkxNjM4MjB9.-JMo-431f4Bkr6NdfcU8y7WFo0ZTi1BxDInRWHWJhtE';
+
+    // 클래스 모듈 import
+    import { App } from './dist/App.js';
+    
+    // 모듈 로딩 오류 처리
+    window.addEventListener('error', (e) => {
+      if (e.message.includes('Failed to fetch dynamically imported module')) {
+        console.error('모듈 로딩 오류:', e);
+      }
+    });
+
+    // ==================== 애플리케이션 시작 ====================
+    // App 인스턴스 생성 및 초기화
+    const app = new App();
+    app.initialize();
+  </script>
+</body>
+</html>

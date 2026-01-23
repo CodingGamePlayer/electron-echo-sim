@@ -1,0 +1,28 @@
+{
+  "name": "electron-ts-app",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.preload.json",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "cesium": "^1.137.0"
+  }
+}
