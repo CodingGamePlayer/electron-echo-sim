@@ -16,6 +16,17 @@ export class CesiumViewerManager {
   async initialize(): Promise<any> {
     this.viewer = new Cesium.Viewer(this.containerId, {
       terrain: Cesium.Terrain.fromWorldTerrain(),
+      animation: false, // 시간 속도 컨트롤러 숨기기
+      timeline: false,  // 타임라인 컨트롤러 숨기기
+      vrButton: false, // VR 버튼 숨기기
+      geocoder: false, // 지오코더 숨기기
+      homeButton: false, // 홈 버튼 숨기기
+      infoBox: false,   // 정보 박스 숨기기
+      sceneModePicker: false, // 씬 모드 선택기 숨기기
+      selectionIndicator: false, // 선택 표시기 숨기기
+      baseLayerPicker: false, // 기본 레이어 선택기 숨기기
+      navigationHelpButton: false, // 네비게이션 도움말 버튼 숨기기
+      fullscreenButton: false, // 전체화면 버튼 숨기기
     });
 
     // 클럭 설정
