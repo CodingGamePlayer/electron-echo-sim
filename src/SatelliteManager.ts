@@ -72,7 +72,8 @@ export class SatelliteManager {
       // 라디안을 도로 변환
       const longitude = (window as any).satellite.degreesLong(geodeticCoords.longitude);
       const latitude = (window as any).satellite.degreesLat(geodeticCoords.latitude);
-      const altitude = geodeticCoords.height; // 미터 단위
+      // satellite.js의 eciToGeodetic는 고도를 킬로미터로 반환하므로 미터로 변환
+      const altitude = geodeticCoords.height * 1000; // 킬로미터를 미터로 변환
       
       return {
         longitude: longitude,

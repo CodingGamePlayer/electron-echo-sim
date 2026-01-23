@@ -21,6 +21,8 @@ export class EntityManager {
   private swathGeometry: SARSwathGeometry | null;
   private lastSwathUpdateTime: number;
   private realtimeSwathId: string | null;
+  private headingOffset: number; // Swath 방향 조정을 위한 heading 오프셋 (도)
+  private altitudeOffset: number; // 위성 고도 조정을 위한 고도 오프셋 (미터)
 
   constructor(viewer: any, satelliteManager: SatelliteManager) {
     this.viewer = viewer;
@@ -36,6 +38,8 @@ export class EntityManager {
     this.swathGeometry = null;
     this.lastSwathUpdateTime = 0;
     this.realtimeSwathId = null;
+    this.headingOffset = 0; // 기본값: 오프셋 없음
+    this.altitudeOffset = 0; // 기본값: 오프셋 없음
   }
 
   /**
@@ -110,10 +114,12 @@ export class EntityManager {
         const position = this.satelliteManager.calculatePosition(currentTime);
         
         if (position) {
+          // 고도 오프셋 적용
+          const adjustedAltitude = position.altitude + this.altitudeOffset;
           const newCartesian = Cesium.Cartesian3.fromDegrees(
             position.longitude,
             position.latitude,
-            position.altitude
+            adjustedAltitude
           );
           
           // 부드러운 이동을 위한 선형 보간
@@ -156,10 +162,12 @@ export class EntityManager {
    */
   updatePosition(position: { longitude: number; latitude: number; altitude: number }): void {
     if (position && this.position) {
+      // 고도 오프셋 적용
+      const adjustedAltitude = position.altitude + this.altitudeOffset;
       const cartesian = Cesium.Cartesian3.fromDegrees(
         position.longitude,
         position.latitude,
-        position.altitude
+        adjustedAltitude
       );
       this.currentCartesian = cartesian.clone();
       this.position.setValue(cartesian);
@@ -305,14 +313,14 @@ export class EntityManager {
     });
 
     // Entity 방식 사용 (더 안정적이고 즉시 표시됨)
+    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
+    const adjustedAlpha = Math.min(0.6 * 0.3, 0.15);
     const newSwathEntity = this.viewer.entities.add({
       name: `SAR Swath ${this.swathEntities.length + 1}`,
       polygon: {
         hierarchy: positions,
-        material: Cesium.Color.CYAN.withAlpha(0.6),
-        outline: true,
-        outlineColor: Cesium.Color.YELLOW,
-        outlineWidth: 3,
+        material: Cesium.Color.CYAN.withAlpha(adjustedAlpha),
+        outline: false,
         classificationType: Cesium.ClassificationType.TERRAIN, // 지형에 드레이프
         height: 0,
         extrudedHeight: 0,
@@ -331,6 +339,8 @@ export class EntityManager {
     });
     
     // GroundPrimitive 방식도 시도 (지형에 더 정확하게 밀착)
+    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
+    const primitiveAdjustedAlpha = Math.min(0.4 * 0.3, 0.15);
     try {
       const newSwathPrimitive = new Cesium.GroundPrimitive({
         geometryInstances: new Cesium.GeometryInstance({
@@ -340,7 +350,7 @@ export class EntityManager {
           }),
           attributes: {
             color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-              Cesium.Color.CYAN.withAlpha(0.4)
+              Cesium.Color.CYAN.withAlpha(primitiveAdjustedAlpha)
             ),
           },
         }),
@@ -446,6 +456,10 @@ export class EntityManager {
         }
       }
 
+      // Heading 오프셋 적용
+      heading = (heading + this.headingOffset) % 360;
+      if (heading < 0) heading += 360;
+
       return { latitude, longitude, altitude, heading };
     };
 
@@ -523,6 +537,10 @@ export class EntityManager {
             if (heading < 0) heading += 360;
           }
         }
+
+        // Heading 오프셋 적용
+        heading = (heading + this.headingOffset) % 360;
+        if (heading < 0) heading += 360;
 
         predictedPositions.push({
           time: Cesium.JulianDate.toDate(sampleTime).getTime(),
@@ -630,6 +648,10 @@ export class EntityManager {
       }
     }
 
+    // Heading 오프셋 적용
+    heading = (heading + this.headingOffset) % 360;
+    if (heading < 0) heading += 360;
+
     // Swath 기하 파라미터 생성
     // SAR는 side-looking이므로, Swath 중심은 위성의 nadir point에서 
     // look direction으로 offset된 위치입니다.
@@ -670,6 +692,7 @@ export class EntityManager {
     const cartographic = Cesium.Cartographic.fromCartesian(this.currentCartesian);
     const latitude = Cesium.Math.toDegrees(cartographic.latitude);
     const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+    // 고도 오프셋 적용 (currentCartesian에는 이미 적용되어 있음)
     const altitude = cartographic.height;
 
     // Heading 계산
@@ -717,6 +740,55 @@ export class EntityManager {
       }
     }
 
+    // Heading 오프셋 적용
+    heading = (heading + this.headingOffset) % 360;
+    if (heading < 0) heading += 360;
+
     return { latitude, longitude, altitude, heading };
+  }
+
+  /**
+   * ✅ Swath 방향 조정을 위한 heading 오프셋 설정 (도)
+   */
+  setHeadingOffset(offset: number): void {
+    this.headingOffset = offset;
+    console.log(`[EntityManager] Heading 오프셋 설정: ${offset}도`);
+    
+    // 실시간 추적이 실행 중이면 재시작하여 변경사항 적용
+    if (this.realtimeSwathId) {
+      // 현재 설정값을 가져와서 재시작해야 하는데, 이는 UIManager에서 처리
+      // 여기서는 오프셋만 설정
+    }
+  }
+
+  /**
+   * ✅ 현재 heading 오프셋 반환
+   */
+  getHeadingOffset(): number {
+    return this.headingOffset;
+  }
+
+  /**
+   * ✅ 위성 고도 조정을 위한 고도 오프셋 설정 (미터)
+   */
+  setAltitudeOffset(offset: number): void {
+    this.altitudeOffset = offset;
+    console.log(`[EntityManager] 고도 오프셋 설정: ${offset}미터`);
+    
+    // 현재 위치를 다시 업데이트하여 오프셋 적용
+    if (this.satelliteManager.useTLE) {
+      const currentTime = this.viewer.clock.currentTime;
+      const position = this.satelliteManager.calculatePosition(currentTime);
+      if (position) {
+        this.updatePosition(position);
+      }
+    }
+  }
+
+  /**
+   * ✅ 현재 고도 오프셋 반환
+   */
+  getAltitudeOffset(): number {
+    return this.altitudeOffset;
   }
 }

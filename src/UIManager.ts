@@ -101,6 +101,43 @@ export class UIManager {
         alert('TLE 사용이 비활성화되었습니다. TLE를 계속 사용하려면 체크박스를 다시 활성화하세요.');
       }
     });
+
+    // 위성 고도 오프셋 조정
+    const altitudeOffsetInput = document.getElementById('satelliteAltitudeOffset') as HTMLInputElement;
+    if (altitudeOffsetInput) {
+      altitudeOffsetInput.addEventListener('change', () => {
+        const offset = parseFloat(altitudeOffsetInput.value || '0');
+        this.entityManager.setAltitudeOffset(offset);
+        
+        // TLE가 활성화되어 있으면 위치 업데이트
+        if (this.satelliteManager.useTLE) {
+          const currentTime = Cesium.JulianDate.now();
+          const position = this.satelliteManager.calculatePosition(currentTime);
+          if (position) {
+            this.entityManager.updatePosition(position);
+          }
+        }
+        
+        // 실시간 추적이 실행 중이면 재시작하여 변경사항 반영
+        this.applyRealtimeTrackingOptionsIfActive();
+      });
+      altitudeOffsetInput.addEventListener('input', () => {
+        const offset = parseFloat(altitudeOffsetInput.value || '0');
+        this.entityManager.setAltitudeOffset(offset);
+        
+        // TLE가 활성화되어 있으면 위치 업데이트
+        if (this.satelliteManager.useTLE) {
+          const currentTime = Cesium.JulianDate.now();
+          const position = this.satelliteManager.calculatePosition(currentTime);
+          if (position) {
+            this.entityManager.updatePosition(position);
+          }
+        }
+        
+        // 실시간 추적이 실행 중이면 재시작하여 변경사항 반영
+        this.applyRealtimeTrackingOptionsIfActive();
+      });
+    }
   }
 
   /**
@@ -126,9 +163,6 @@ export class UIManager {
           const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
           const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
           const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
-          const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
-          const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
-          const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
           const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
           const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
 
@@ -140,13 +174,10 @@ export class UIManager {
               azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
             },
             {
-              color: swathColor?.value || 'CYAN',
-              alpha: parseFloat(swathAlpha?.value || '0.4'),
-              outlineColor: swathOutlineColor?.value || 'YELLOW',
-              outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
-              showLabel: swathShowLabel?.checked || false,
-              maxSwaths: parseInt(swathMaxCount?.value || '50'),
-              updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+              color: swathColor?.value || 'PURPLE',
+              alpha: parseFloat(swathAlpha?.value || '0.05'),
+              maxSwaths: parseInt(swathMaxCount?.value || '1000'),
+              updateInterval: parseInt(swathUpdateInterval?.value || '500'),
             }
           );
         } else {
@@ -173,18 +204,15 @@ export class UIManager {
     const swathMode = document.getElementById('swathMode') as HTMLSelectElement;
     const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
     const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
-    const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
-    const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
-    const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
     const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
     const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
     const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
     const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
     const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
     const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+    const swathHeadingOffset = document.getElementById('swathHeadingOffset') as HTMLInputElement;
     const addSwathBtn = document.getElementById('addSwathBtn') as HTMLButtonElement;
     const clearAllSwathsBtn = document.getElementById('clearAllSwathsBtn') as HTMLButtonElement;
-    const clearModeSwathsBtn = document.getElementById('clearModeSwathsBtn') as HTMLButtonElement;
     const modeSpecificOptions = document.getElementById('modeSpecificOptions') as HTMLDivElement;
     const alphaValue = document.getElementById('alphaValue') as HTMLSpanElement;
 
@@ -201,10 +229,25 @@ export class UIManager {
       });
     }
 
+    // Heading 오프셋 변경 시 즉시 적용
+    if (swathHeadingOffset) {
+      swathHeadingOffset.addEventListener('change', () => {
+        const offset = parseFloat(swathHeadingOffset.value || '0');
+        this.entityManager.setHeadingOffset(offset);
+        // 실시간 추적이 실행 중이면 재시작하여 변경사항 적용
+        this.applyRealtimeTrackingOptionsIfActive();
+      });
+      swathHeadingOffset.addEventListener('input', () => {
+        const offset = parseFloat(swathHeadingOffset.value || '0');
+        this.entityManager.setHeadingOffset(offset);
+        // 실시간 추적이 실행 중이면 재시작하여 변경사항 적용
+        this.applyRealtimeTrackingOptionsIfActive();
+      });
+    }
+
     // 옵션 변경 시 실시간 추적이 실행 중이면 즉시 적용
     const optionInputs = [
-      swathColor, swathAlpha, swathOutlineColor, swathOutlineWidth,
-      swathShowLabel, swathMaxCount, swathNearRange, swathFarRange,
+      swathColor, swathAlpha, swathMaxCount, swathNearRange, swathFarRange,
       swathWidth, swathAzimuthLength, swathUpdateInterval
     ];
 
@@ -252,12 +295,9 @@ export class UIManager {
         this.addSwathByMode(
           swathMode.value,
           {
-            color: swathColor?.value || 'CYAN',
-            alpha: parseFloat(swathAlpha?.value || '0.4'),
-            outlineColor: swathOutlineColor?.value || 'YELLOW',
-            outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
-            showLabel: swathShowLabel?.checked || false,
-            maxSwaths: parseInt(swathMaxCount?.value || '50'),
+            color: swathColor?.value || 'PURPLE',
+            alpha: parseFloat(swathAlpha?.value || '0.001'),
+            maxSwaths: parseInt(swathMaxCount?.value || '1000'),
           },
           {
             nearRange: parseFloat(swathNearRange?.value || '200000'),
@@ -270,20 +310,52 @@ export class UIManager {
       }
     });
 
-    // 전체 제거 버튼
+    // Swath 초기화 버튼
     if (clearAllSwathsBtn) {
       clearAllSwathsBtn.addEventListener('click', () => {
+        // 실시간 추적이 실행 중인지 확인
+        const wasRealtimeTrackingActive = this.showSwathCheckbox?.checked && 
+          swathMode.value === 'realtime_tracking';
+        
+        // 실시간 추적이 실행 중이었다면 중지
+        if (wasRealtimeTrackingActive) {
+          this.entityManager.stopRealtimeSwathTracking();
+        }
+        
+        // 모든 Swath 제거
         this.entityManager.clearAllSwaths();
         this.updateSwathInfo();
-      });
-    }
+        
+        // 실시간 추적이 실행 중이었다면 다시 시작
+        if (wasRealtimeTrackingActive) {
+          // 제어 패널의 설정값 사용
+          const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+          const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
+          const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+          const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+          const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+          const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+          const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
+          const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
 
-    // 모드별 제거 버튼
-    if (clearModeSwathsBtn) {
-      clearModeSwathsBtn.addEventListener('click', () => {
-        const mode = this.getSwathModeFromString(swathMode.value);
-        this.entityManager.clearSwathsByMode(mode);
-        this.updateSwathInfo();
+          this.entityManager.startRealtimeSwathTracking(
+            {
+              nearRange: parseFloat(swathNearRange?.value || '200000'),
+              farRange: parseFloat(swathFarRange?.value || '800000'),
+              swathWidth: parseFloat(swathWidth?.value || '50000'),
+              azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+            },
+            {
+              color: swathColor?.value || 'PURPLE',
+              alpha: parseFloat(swathAlpha?.value || '0.05'),
+              outlineColor: 'YELLOW',
+              outlineWidth: 2,
+              showLabel: false,
+              maxSwaths: parseInt(swathMaxCount?.value || '1000'),
+              updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+            }
+          );
+        }
       });
     }
 
@@ -474,9 +546,6 @@ export class UIManager {
     const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
     const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
     const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
-    const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
-    const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
-    const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
     const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
     const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
 
@@ -493,10 +562,10 @@ export class UIManager {
       },
       {
         color: swathColor?.value || 'CYAN',
-        alpha: parseFloat(swathAlpha?.value || '0.4'),
-        outlineColor: swathOutlineColor?.value || 'YELLOW',
-        outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
-        showLabel: swathShowLabel?.checked || false,
+            alpha: parseFloat(swathAlpha?.value || '0.05'),
+        outlineColor: 'YELLOW',
+        outlineWidth: 2,
+        showLabel: false,
         maxSwaths: parseInt(swathMaxCount?.value || '50'),
         updateInterval: parseInt(swathUpdateInterval?.value || '200'),
       }

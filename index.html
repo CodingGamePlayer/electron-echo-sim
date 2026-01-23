@@ -14,92 +14,111 @@
       padding: 0;
       overflow: hidden;
     }
-    #tlePanel {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(42, 42, 42, 0.9);
-      padding: 15px;
-      border-radius: 5px;
+
+    /* 사이드바 스타일 */
+    #sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 380px;
+      height: 100vh;
+      background: rgba(42, 42, 42, 0.95);
       color: white;
       font-family: sans-serif;
       z-index: 1000;
-      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+      transition: transform 0.3s ease;
     }
-    #tlePanel h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
+
+    #sidebar.collapsed {
+      transform: translateX(-340px);
     }
-    #tleInput {
-      width: 100%;
-      height: 120px;
-      background: rgba(0, 0, 0, 0.5);
-      color: white;
+
+    #sidebarHeader {
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid #555;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #sidebarHeader h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    #sidebarToggle {
+      background: rgba(255, 255, 255, 0.1);
       border: 1px solid #555;
-      border-radius: 3px;
-      padding: 8px;
-      font-family: monospace;
-      font-size: 11px;
-      resize: vertical;
-      box-sizing: border-box;
-    }
-    #tlePanel button {
-      margin-top: 10px;
-      padding: 8px 15px;
-      background: #4CAF50;
       color: white;
-      border: none;
+      padding: 5px 10px;
       border-radius: 3px;
       cursor: pointer;
       font-size: 12px;
     }
-    #tlePanel button:hover {
-      background: #45a049;
+
+    #sidebarToggle:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
-    #tlePanel label {
+
+    #sidebarContent {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px;
+    }
+
+    #sidebarContent::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #sidebarContent::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    #sidebarContent::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    #sidebarContent::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .sidebar-section {
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #555;
+    }
+
+    .sidebar-section:last-child {
+      border-bottom: none;
+    }
+
+    .sidebar-section h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      font-weight: bold;
+      color: #4CAF50;
+    }
+
+    .sidebar-section label {
       display: block;
       margin-top: 10px;
       font-size: 12px;
     }
-    #useTLE {
-      margin-top: 5px;
-    }
-    #swathPanel {
-      position: absolute;
-      top: 10px;
-      left: 430px;
-      background: rgba(42, 42, 42, 0.9);
-      padding: 15px;
-      border-radius: 5px;
-      color: white;
-      font-family: sans-serif;
-      z-index: 1000;
-      max-width: 400px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    #swathPanel h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
-    }
-    #swathPanel .section {
-      margin-top: 15px;
-      padding-top: 15px;
-      border-top: 1px solid #555;
-    }
-    #swathPanel .section:first-child {
+
+    .sidebar-section label:first-child {
       margin-top: 0;
-      padding-top: 0;
-      border-top: none;
     }
-    #swathPanel label {
-      display: block;
-      margin-top: 8px;
-      font-size: 12px;
-    }
-    #swathPanel input[type="text"],
-    #swathPanel input[type="number"],
-    #swathPanel select {
+
+    .sidebar-section input[type="text"],
+    .sidebar-section input[type="number"],
+    .sidebar-section select,
+    .sidebar-section textarea {
       width: 100%;
       padding: 6px;
       background: rgba(0, 0, 0, 0.5);
@@ -108,159 +127,189 @@
       border-radius: 3px;
       box-sizing: border-box;
       font-size: 12px;
+      margin-top: 4px;
     }
-    #swathPanel input[type="range"] {
+
+    .sidebar-section textarea {
+      resize: vertical;
+      font-family: monospace;
+      font-size: 11px;
+      min-height: 100px;
+    }
+
+    .sidebar-section input[type="range"] {
       width: 100%;
+      margin-top: 4px;
     }
-    #swathPanel button {
+
+    .sidebar-section input[type="checkbox"] {
+      margin-right: 6px;
+    }
+
+    .sidebar-section button {
       margin-top: 8px;
-      padding: 6px 12px;
+      padding: 8px 12px;
       background: #4CAF50;
       color: white;
       border: none;
       border-radius: 3px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 12px;
       width: 100%;
     }
-    #swathPanel button:hover {
+
+    .sidebar-section button:hover {
       background: #45a049;
     }
-    #swathPanel button.danger {
+
+    .sidebar-section button.danger {
       background: #f44336;
     }
-    #swathPanel button.danger:hover {
+
+    .sidebar-section button.danger:hover {
       background: #da190b;
     }
-    #swathPanel .info {
+
+    .sidebar-section .info {
       font-size: 11px;
       color: #aaa;
       margin-top: 5px;
+      line-height: 1.4;
     }
-    #swathPanel .row {
+
+    .sidebar-section .row {
       display: flex;
       gap: 10px;
     }
-    #swathPanel .row > * {
+
+    .sidebar-section .row > * {
       flex: 1;
+    }
+
+    .sidebar-section h4 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      font-weight: bold;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
   <div id="cesiumContainer"></div>
   
-  <!-- TLE 입력 패널 -->
-  <div id="tlePanel">
-    <h3>TLE 입력</h3>
-    <label>
-      <input type="checkbox" id="useTLE"> TLE 사용
-    </label>
-    <textarea id="tleInput" placeholder="TLE 데이터를 입력하세요 (2줄 또는 3줄)&#10;예시:&#10;ISS (ZARYA)&#10;1 25544U 98067A   24123.45678901  .00001234  00000+0  12345-4 0  9999&#10;2 25544  51.6442 123.4567 0001234 234.5678 123.4567 15.12345678901234"></textarea>
-    <button id="applyTLE">TLE 적용</button>
-    <label style="margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
-      <input type="checkbox" id="showSwath"> SAR Swath 표시
-    </label>
-  </div>
-  
-  <!-- Swath 제어 패널 -->
-  <div id="swathPanel">
-    <h3>SAR Swath 제어</h3>
-    
-    <div class="section">
-      <label>
-        모드 선택:
-        <select id="swathMode">
-          <option value="static">정적 (Static)</option>
-          <option value="realtime_tracking">실시간 추적 (Realtime Tracking)</option>
-          <option value="predicted_path">예측 경로 (Predicted Path)</option>
-          <option value="historical">과거 경로 (Historical)</option>
-          <option value="backend_api">Backend API</option>
-          <option value="custom_geometry">사용자 정의 기하 (Custom Geometry)</option>
-        </select>
-      </label>
+  <!-- 사이드바 -->
+  <div id="sidebar">
+    <div id="sidebarHeader">
+      <h2>제어 패널</h2>
+      <button id="sidebarToggle">◀ 접기</button>
     </div>
-    
-    <div class="section">
-      <h4 style="margin: 0 0 8px 0; font-size: 12px;">시각화 옵션</h4>
-      <label>
-        색상:
-        <select id="swathColor">
-          <option value="CYAN">Cyan</option>
-          <option value="YELLOW">Yellow</option>
-          <option value="RED">Red</option>
-          <option value="GREEN">Green</option>
-          <option value="BLUE">Blue</option>
-          <option value="ORANGE">Orange</option>
-          <option value="PURPLE">Purple</option>
-          <option value="GRAY">Gray</option>
-        </select>
-      </label>
-      <label>
-        투명도: <span id="alphaValue">0.4</span>
-        <input type="range" id="swathAlpha" min="0" max="1" step="0.1" value="0.4">
-      </label>
-      <label>
-        테두리 색상:
-        <select id="swathOutlineColor">
-          <option value="YELLOW">Yellow</option>
-          <option value="CYAN">Cyan</option>
-          <option value="RED">Red</option>
-          <option value="GREEN">Green</option>
-          <option value="WHITE">White</option>
-        </select>
-      </label>
-      <label>
-        테두리 두께:
-        <input type="number" id="swathOutlineWidth" min="1" max="10" value="2">
-      </label>
-      <label>
-        <input type="checkbox" id="swathShowLabel"> 라벨 표시
-      </label>
-      <label>
-        최대 Swath 개수:
-        <input type="number" id="swathMaxCount" min="1" max="200" value="50">
-      </label>
-      <label>
-        업데이트 간격 (ms):
-        <input type="number" id="swathUpdateInterval" min="50" max="5000" value="200" step="50">
-        <div class="info" style="margin-top: 3px;">값이 작을수록 더 빠르게 Swath가 생성됩니다 (권장: 100-500ms)</div>
-      </label>
-    </div>
-    
-    <div class="section">
-      <h4 style="margin: 0 0 8px 0; font-size: 12px;">Swath 파라미터</h4>
-      <label>
-        Near Range (m):
-        <input type="number" id="swathNearRange" value="200000" step="1000">
-      </label>
-      <label>
-        Far Range (m):
-        <input type="number" id="swathFarRange" value="800000" step="1000">
-      </label>
-      <label>
-        Swath Width (m):
-        <input type="number" id="swathWidth" value="50000" step="1000">
-      </label>
-      <label>
-        Azimuth Length (m):
-        <input type="number" id="swathAzimuthLength" value="50000" step="1000">
-      </label>
-    </div>
-    
-    <div class="section">
-      <h4 style="margin: 0 0 8px 0; font-size: 12px;">모드별 옵션</h4>
-      <div id="modeSpecificOptions">
-        <!-- 모드별 옵션이 동적으로 표시됨 -->
+    <div id="sidebarContent">
+      <!-- TLE 입력 섹션 -->
+      <div class="sidebar-section">
+        <h3>TLE 입력</h3>
+        <label>
+          <input type="checkbox" id="useTLE"> TLE 사용
+        </label>
+        <label>
+          TLE 데이터:
+          <textarea id="tleInput" placeholder="TLE 데이터를 입력하세요 (2줄 또는 3줄)&#10;예시:&#10;ISS (ZARYA)&#10;1 25544U 98067A   24123.45678901  .00001234  00000+0  12345-4 0  9999&#10;2 25544  51.6442 123.4567 0001234 234.5678 123.4567 15.12345678901234"></textarea>
+        </label>
+        <button id="applyTLE">TLE 적용</button>
+        <label style="margin-top: 15px;">
+          위성 고도 오프셋 (m):
+          <input type="number" id="satelliteAltitudeOffset" value="0" step="1000" min="-1000000" max="1000000">
+          <div class="info">위성 고도를 조정합니다. 양수는 고도 증가, 음수는 고도 감소입니다.</div>
+        </label>
+        <label style="margin-top: 15px;">
+          <input type="checkbox" id="showSwath"> SAR Swath 표시
+        </label>
       </div>
-    </div>
-    
-    <div class="section">
-      <button id="addSwathBtn">Swath 추가</button>
-      <div class="row" style="margin-top: 8px;">
-        <button id="clearAllSwathsBtn" class="danger">전체 제거</button>
-        <button id="clearModeSwathsBtn" class="danger">모드별 제거</button>
+
+      <!-- SAR Swath 제어 섹션 -->
+      <div class="sidebar-section">
+        <h3>SAR Swath 제어</h3>
+        
+        <label>
+          모드 선택:
+          <select id="swathMode">
+            <option value="static">정적 (Static)</option>
+            <option value="realtime_tracking">실시간 추적 (Realtime Tracking)</option>
+            <option value="predicted_path">예측 경로 (Predicted Path)</option>
+            <option value="historical">과거 경로 (Historical)</option>
+            <option value="backend_api">Backend API</option>
+            <option value="custom_geometry">사용자 정의 기하 (Custom Geometry)</option>
+          </select>
+        </label>
       </div>
-      <div class="info" id="swathInfo">Swath 개수: 0</div>
+
+      <div class="sidebar-section">
+        <h4>시각화 옵션</h4>
+        <label>
+          색상:
+          <select id="swathColor">
+            <option value="PURPLE" selected>Purple</option>
+            <option value="CYAN">Cyan</option>
+            <option value="YELLOW">Yellow</option>
+            <option value="RED">Red</option>
+            <option value="GREEN">Green</option>
+            <option value="BLUE">Blue</option>
+            <option value="ORANGE">Orange</option>
+            <option value="GRAY">Gray</option>
+          </select>
+        </label>
+        <label>
+          투명도: <span id="alphaValue">0.05</span>
+          <input type="range" id="swathAlpha" min="0" max="1" step="0.01" value="0.05">
+          <div class="info">0.01 단위로 조정 가능합니다 (0 = 완전 투명, 1 = 불투명)</div>
+        </label>
+        <label>
+          최대 Swath 개수:
+          <input type="number" id="swathMaxCount" min="1" max="2000" value="1000">
+        </label>
+        <label>
+          업데이트 간격 (ms):
+          <input type="number" id="swathUpdateInterval" min="50" max="5000" value="200" step="50">
+          <div class="info">값이 작을수록 더 빠르게 Swath가 생성됩니다 (권장: 100-500ms)</div>
+        </label>
+      </div>
+      
+      <div class="sidebar-section">
+        <h4>Swath 파라미터</h4>
+        <label>
+          Near Range (m):
+          <input type="number" id="swathNearRange" value="200000" step="1000">
+        </label>
+        <label>
+          Far Range (m):
+          <input type="number" id="swathFarRange" value="800000" step="1000">
+        </label>
+        <label>
+          Swath Width (m):
+          <input type="number" id="swathWidth" value="50000" step="1000">
+        </label>
+        <label>
+          Azimuth Length (m):
+          <input type="number" id="swathAzimuthLength" value="50000" step="1000">
+        </label>
+        <label>
+          Heading 오프셋 (도):
+          <input type="number" id="swathHeadingOffset" value="0" min="-180" max="180" step="1">
+          <div class="info">Swath 방향을 조정합니다. 양수는 시계 방향, 음수는 반시계 방향입니다.</div>
+        </label>
+      </div>
+      
+      <div class="sidebar-section">
+        <h4>모드별 옵션</h4>
+        <div id="modeSpecificOptions">
+          <!-- 모드별 옵션이 동적으로 표시됨 -->
+        </div>
+      </div>
+      
+      <div class="sidebar-section">
+        <button id="addSwathBtn">Swath 추가</button>
+        <button id="clearAllSwathsBtn" class="danger" style="margin-top: 8px;">지금까지 쌓은 Swath 초기화</button>
+        <div class="info" id="swathInfo" style="margin-top: 10px;">Swath 개수: 0</div>
+      </div>
     </div>
   </div>
   
@@ -287,6 +336,16 @@
     // App 인스턴스 생성 및 초기화
     const app = new App();
     app.initialize();
+
+    // 사이드바 접기/펼치기 기능
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebar && sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+        sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶ 펼치기' : '◀ 접기';
+      });
+    }
   </script>
 </body>
 </html>

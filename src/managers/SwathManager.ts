@@ -19,12 +19,12 @@ export class SwathManager {
 
   private static readonly DEFAULT_OPTIONS: SwathVisualizationOptions = {
     mode: SwathMode.STATIC,
-    color: 'CYAN',
-    alpha: 0.4,
+    color: 'PURPLE',
+    alpha: 0.05,
     outlineColor: 'YELLOW',
     outlineWidth: 2,
     showLabel: false,
-    maxSwaths: 50,
+    maxSwaths: 1000,
     updateInterval: 200, // 200ms (0.2초) - 더 빠른 업데이트
     useGroundPrimitive: true,
     useEntity: true,
@@ -49,6 +49,9 @@ export class SwathManager {
 
     const instance = this.createSwathInstance(swathId, geometry, opts);
     this.swaths.set(swathId, instance);
+    
+    // 최대 개수 제한 체크 (Swath 추가 후 호출)
+    this.enforceMaxSwaths(opts.maxSwaths!);
 
     console.log(`[SwathManager] 정적 Swath 생성: ${swathId}`, geometry);
     return swathId;
@@ -102,6 +105,9 @@ export class SwathManager {
 
     const instance = this.createSwathInstance(swathId, initialGeometry, opts);
     this.swaths.set(swathId, instance);
+    
+    // 최대 개수 제한 체크 (초기 Swath 추가 후 호출)
+    this.enforceMaxSwaths(opts.maxSwaths!);
 
     // 실시간 업데이트 루프 시작
     const updateHandler = () => {
@@ -122,6 +128,9 @@ export class SwathManager {
         const newSwathId = this.generateSwathId();
         const newInstance = this.createSwathInstance(newSwathId, updatedGeometry, opts);
         this.swaths.set(newSwathId, newInstance);
+        
+        // 최대 개수 제한 체크 (새 Swath 추가 후 호출)
+        this.enforceMaxSwaths(opts.maxSwaths!);
       }
     };
 
@@ -188,6 +197,9 @@ export class SwathManager {
       this.swaths.set(swathId, instance);
       swathIds.push(swathId);
     });
+
+    // 최대 개수 제한 체크 (모든 Swath 추가 후 호출)
+    this.enforceMaxSwaths(opts.maxSwaths!);
 
     console.log(`[SwathManager] 예측 경로 Swath 생성: ${swathIds.length}개`);
     return swathIds;
@@ -258,6 +270,9 @@ export class SwathManager {
           this.swaths.set(swathId, instance);
           swathIds.push(swathId);
         });
+        
+        // 최대 개수 제한 체크 (모든 Swath 추가 후 호출)
+        this.enforceMaxSwaths(opts.maxSwaths!);
       }
 
       console.log(`[SwathManager] Backend API Swath 생성: ${swathIds.length}개`);
@@ -307,6 +322,10 @@ export class SwathManager {
     }
 
     this.swaths.set(swathId, instance);
+    
+    // 최대 개수 제한 체크 (Swath 추가 후 호출)
+    this.enforceMaxSwaths(opts.maxSwaths!);
+    
     console.log(`[SwathManager] 사용자 정의 Swath 생성: ${swathId}`);
     return swathId;
   }
@@ -363,9 +382,6 @@ export class SwathManager {
       });
     }
 
-    // 최대 개수 제한 체크
-    this.enforceMaxSwaths(options.maxSwaths!);
-
     return instance;
   }
 
@@ -377,7 +393,9 @@ export class SwathManager {
     positions: any[],
     options: SwathVisualizationOptions
   ): any {
-    const color = this.getCesiumColor(options.color!, options.alpha!);
+    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
+    const adjustedAlpha = Math.min(options.alpha! * 0.3, 0.15);
+    const color = this.getCesiumColor(options.color!, adjustedAlpha);
     const outlineColor = this.getCesiumColor(options.outlineColor!);
 
     return this.viewer.entities.add({
@@ -385,12 +403,12 @@ export class SwathManager {
       polygon: {
         hierarchy: positions,
         material: color,
-        outline: true,
-        outlineColor: outlineColor,
-        outlineWidth: options.outlineWidth,
+        outline: false,
         classificationType: Cesium.ClassificationType.TERRAIN,
         height: 0,
         extrudedHeight: 0,
+        // 깊이 테스트를 조정하여 겹침 시 진해지는 현상 완화
+        depthFailMaterial: undefined,
       },
     });
   }
@@ -402,7 +420,9 @@ export class SwathManager {
     positions: any[],
     options: SwathVisualizationOptions
   ): any {
-    const color = this.getCesiumColor(options.color!, options.alpha!);
+    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
+    const adjustedAlpha = Math.min(options.alpha! * 0.3, 0.15);
+    const color = this.getCesiumColor(options.color!, adjustedAlpha);
 
     try {
       const primitive = new Cesium.GroundPrimitive({
