@@ -64,6 +64,86 @@
     #useTLE {
       margin-top: 5px;
     }
+    #swathPanel {
+      position: absolute;
+      top: 10px;
+      left: 430px;
+      background: rgba(42, 42, 42, 0.9);
+      padding: 15px;
+      border-radius: 5px;
+      color: white;
+      font-family: sans-serif;
+      z-index: 1000;
+      max-width: 400px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #swathPanel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
+    #swathPanel .section {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #555;
+    }
+    #swathPanel .section:first-child {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    #swathPanel label {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    #swathPanel input[type="text"],
+    #swathPanel input[type="number"],
+    #swathPanel select {
+      width: 100%;
+      padding: 6px;
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: 1px solid #555;
+      border-radius: 3px;
+      box-sizing: border-box;
+      font-size: 12px;
+    }
+    #swathPanel input[type="range"] {
+      width: 100%;
+    }
+    #swathPanel button {
+      margin-top: 8px;
+      padding: 6px 12px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      width: 100%;
+    }
+    #swathPanel button:hover {
+      background: #45a049;
+    }
+    #swathPanel button.danger {
+      background: #f44336;
+    }
+    #swathPanel button.danger:hover {
+      background: #da190b;
+    }
+    #swathPanel .info {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 5px;
+    }
+    #swathPanel .row {
+      display: flex;
+      gap: 10px;
+    }
+    #swathPanel .row > * {
+      flex: 1;
+    }
   </style>
 </head>
 <body>
@@ -80,6 +160,108 @@
     <label style="margin-top: 15px; border-top: 1px solid #555; padding-top: 10px;">
       <input type="checkbox" id="showSwath"> SAR Swath 표시
     </label>
+  </div>
+  
+  <!-- Swath 제어 패널 -->
+  <div id="swathPanel">
+    <h3>SAR Swath 제어</h3>
+    
+    <div class="section">
+      <label>
+        모드 선택:
+        <select id="swathMode">
+          <option value="static">정적 (Static)</option>
+          <option value="realtime_tracking">실시간 추적 (Realtime Tracking)</option>
+          <option value="predicted_path">예측 경로 (Predicted Path)</option>
+          <option value="historical">과거 경로 (Historical)</option>
+          <option value="backend_api">Backend API</option>
+          <option value="custom_geometry">사용자 정의 기하 (Custom Geometry)</option>
+        </select>
+      </label>
+    </div>
+    
+    <div class="section">
+      <h4 style="margin: 0 0 8px 0; font-size: 12px;">시각화 옵션</h4>
+      <label>
+        색상:
+        <select id="swathColor">
+          <option value="CYAN">Cyan</option>
+          <option value="YELLOW">Yellow</option>
+          <option value="RED">Red</option>
+          <option value="GREEN">Green</option>
+          <option value="BLUE">Blue</option>
+          <option value="ORANGE">Orange</option>
+          <option value="PURPLE">Purple</option>
+          <option value="GRAY">Gray</option>
+        </select>
+      </label>
+      <label>
+        투명도: <span id="alphaValue">0.4</span>
+        <input type="range" id="swathAlpha" min="0" max="1" step="0.1" value="0.4">
+      </label>
+      <label>
+        테두리 색상:
+        <select id="swathOutlineColor">
+          <option value="YELLOW">Yellow</option>
+          <option value="CYAN">Cyan</option>
+          <option value="RED">Red</option>
+          <option value="GREEN">Green</option>
+          <option value="WHITE">White</option>
+        </select>
+      </label>
+      <label>
+        테두리 두께:
+        <input type="number" id="swathOutlineWidth" min="1" max="10" value="2">
+      </label>
+      <label>
+        <input type="checkbox" id="swathShowLabel"> 라벨 표시
+      </label>
+      <label>
+        최대 Swath 개수:
+        <input type="number" id="swathMaxCount" min="1" max="200" value="50">
+      </label>
+      <label>
+        업데이트 간격 (ms):
+        <input type="number" id="swathUpdateInterval" min="50" max="5000" value="200" step="50">
+        <div class="info" style="margin-top: 3px;">값이 작을수록 더 빠르게 Swath가 생성됩니다 (권장: 100-500ms)</div>
+      </label>
+    </div>
+    
+    <div class="section">
+      <h4 style="margin: 0 0 8px 0; font-size: 12px;">Swath 파라미터</h4>
+      <label>
+        Near Range (m):
+        <input type="number" id="swathNearRange" value="200000" step="1000">
+      </label>
+      <label>
+        Far Range (m):
+        <input type="number" id="swathFarRange" value="800000" step="1000">
+      </label>
+      <label>
+        Swath Width (m):
+        <input type="number" id="swathWidth" value="50000" step="1000">
+      </label>
+      <label>
+        Azimuth Length (m):
+        <input type="number" id="swathAzimuthLength" value="50000" step="1000">
+      </label>
+    </div>
+    
+    <div class="section">
+      <h4 style="margin: 0 0 8px 0; font-size: 12px;">모드별 옵션</h4>
+      <div id="modeSpecificOptions">
+        <!-- 모드별 옵션이 동적으로 표시됨 -->
+      </div>
+    </div>
+    
+    <div class="section">
+      <button id="addSwathBtn">Swath 추가</button>
+      <div class="row" style="margin-top: 8px;">
+        <button id="clearAllSwathsBtn" class="danger">전체 제거</button>
+        <button id="clearModeSwathsBtn" class="danger">모드별 제거</button>
+      </div>
+      <div class="info" id="swathInfo">Swath 개수: 0</div>
+    </div>
   </div>
   
   <!-- Satellite.js 라이브러리 (TLE 파싱 및 SGP4 계산용) -->

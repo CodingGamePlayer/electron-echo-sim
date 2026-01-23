@@ -1,5 +1,6 @@
 import { SatelliteManager } from './SatelliteManager.js';
 import { EntityManager } from './EntityManager.js';
+import { SwathMode, SARSwathGeometry } from './types/sar-swath.types.js';
 
 /**
  * UIManager - UI 이벤트 처리
@@ -40,6 +41,8 @@ export class UIManager {
 
     this.setupTLEHandlers();
     this.setupSwathHandlers();
+    this.setupSwathControlHandlers();
+    this.updateSwathInfo();
   }
 
   /**
@@ -108,10 +111,424 @@ export class UIManager {
       return;
     }
 
-    // Swath 표시 체크박스
+    // Swath 표시 체크박스 - 실시간 추적 모드와 연동
     this.showSwathCheckbox.addEventListener('change', () => {
       const showSwath = this.showSwathCheckbox!.checked;
-      this.entityManager.toggleSwath(showSwath);
+      const swathMode = document.getElementById('swathMode') as HTMLSelectElement;
+      
+      if (showSwath) {
+        // 실시간 추적 모드로 시작
+        if (swathMode && swathMode.value === 'realtime_tracking') {
+          // 제어 패널의 설정값 사용
+          const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+          const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
+          const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+          const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+          const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+          const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+          const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
+          const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
+          const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
+          const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
+          const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
+
+          this.entityManager.startRealtimeSwathTracking(
+            {
+              nearRange: parseFloat(swathNearRange?.value || '200000'),
+              farRange: parseFloat(swathFarRange?.value || '800000'),
+              swathWidth: parseFloat(swathWidth?.value || '50000'),
+              azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+            },
+            {
+              color: swathColor?.value || 'CYAN',
+              alpha: parseFloat(swathAlpha?.value || '0.4'),
+              outlineColor: swathOutlineColor?.value || 'YELLOW',
+              outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
+              showLabel: swathShowLabel?.checked || false,
+              maxSwaths: parseInt(swathMaxCount?.value || '50'),
+              updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+            }
+          );
+        } else {
+          // 다른 모드일 때는 실시간 추적 모드로 전환
+          if (swathMode) {
+            swathMode.value = 'realtime_tracking';
+            const modeSpecificOptions = document.getElementById('modeSpecificOptions') as HTMLDivElement;
+            this.updateModeSpecificOptions('realtime_tracking', modeSpecificOptions);
+          }
+          // 실시간 추적 시작
+          this.entityManager.startRealtimeSwathTracking();
+        }
+      } else {
+        // 실시간 추적 중지
+        this.entityManager.stopRealtimeSwathTracking();
+      }
     });
+  }
+
+  /**
+   * ✅ Swath 제어 패널 핸들러 설정
+   */
+  setupSwathControlHandlers(): void {
+    const swathMode = document.getElementById('swathMode') as HTMLSelectElement;
+    const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+    const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+    const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
+    const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
+    const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
+    const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
+    const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
+    const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+    const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
+    const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+    const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+    const addSwathBtn = document.getElementById('addSwathBtn') as HTMLButtonElement;
+    const clearAllSwathsBtn = document.getElementById('clearAllSwathsBtn') as HTMLButtonElement;
+    const clearModeSwathsBtn = document.getElementById('clearModeSwathsBtn') as HTMLButtonElement;
+    const modeSpecificOptions = document.getElementById('modeSpecificOptions') as HTMLDivElement;
+    const alphaValue = document.getElementById('alphaValue') as HTMLSpanElement;
+
+    if (!swathMode || !addSwathBtn) {
+      return;
+    }
+
+    // 투명도 슬라이더 업데이트
+    if (swathAlpha && alphaValue) {
+      swathAlpha.addEventListener('input', () => {
+        alphaValue.textContent = swathAlpha.value;
+        // 실시간 추적이 실행 중이면 옵션 적용
+        this.applyRealtimeTrackingOptionsIfActive();
+      });
+    }
+
+    // 옵션 변경 시 실시간 추적이 실행 중이면 즉시 적용
+    const optionInputs = [
+      swathColor, swathAlpha, swathOutlineColor, swathOutlineWidth,
+      swathShowLabel, swathMaxCount, swathNearRange, swathFarRange,
+      swathWidth, swathAzimuthLength, swathUpdateInterval
+    ];
+
+    optionInputs.forEach(input => {
+      if (input) {
+        input.addEventListener('change', () => {
+          this.applyRealtimeTrackingOptionsIfActive();
+        });
+        // 숫자 입력 필드는 input 이벤트도 감지
+        if (input.type === 'number') {
+          input.addEventListener('input', () => {
+            this.applyRealtimeTrackingOptionsIfActive();
+          });
+        }
+      }
+    });
+
+    // 모드 변경 시 모드별 옵션 업데이트 및 체크박스 상태 동기화
+    swathMode.addEventListener('change', () => {
+      this.updateModeSpecificOptions(swathMode.value, modeSpecificOptions);
+      
+      // 실시간 추적 모드가 아닐 때는 체크박스 해제
+      if (swathMode.value !== 'realtime_tracking' && this.showSwathCheckbox) {
+        if (this.showSwathCheckbox.checked) {
+          this.entityManager.stopRealtimeSwathTracking();
+          this.showSwathCheckbox.checked = false;
+        }
+      }
+    });
+    this.updateModeSpecificOptions(swathMode.value, modeSpecificOptions);
+
+    // Swath 추가 버튼
+    addSwathBtn.addEventListener('click', () => {
+      // 실시간 추적 모드일 때는 체크박스와 연동
+      if (swathMode.value === 'realtime_tracking') {
+        if (this.showSwathCheckbox) {
+          if (!this.showSwathCheckbox.checked) {
+            // 체크박스가 꺼져있으면 켜기
+            this.showSwathCheckbox.checked = true;
+            this.showSwathCheckbox.dispatchEvent(new Event('change'));
+          }
+        }
+      } else {
+        // 다른 모드일 때는 직접 추가
+        this.addSwathByMode(
+          swathMode.value,
+          {
+            color: swathColor?.value || 'CYAN',
+            alpha: parseFloat(swathAlpha?.value || '0.4'),
+            outlineColor: swathOutlineColor?.value || 'YELLOW',
+            outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
+            showLabel: swathShowLabel?.checked || false,
+            maxSwaths: parseInt(swathMaxCount?.value || '50'),
+          },
+          {
+            nearRange: parseFloat(swathNearRange?.value || '200000'),
+            farRange: parseFloat(swathFarRange?.value || '800000'),
+            swathWidth: parseFloat(swathWidth?.value || '50000'),
+            azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+          }
+        );
+        this.updateSwathInfo();
+      }
+    });
+
+    // 전체 제거 버튼
+    if (clearAllSwathsBtn) {
+      clearAllSwathsBtn.addEventListener('click', () => {
+        this.entityManager.clearAllSwaths();
+        this.updateSwathInfo();
+      });
+    }
+
+    // 모드별 제거 버튼
+    if (clearModeSwathsBtn) {
+      clearModeSwathsBtn.addEventListener('click', () => {
+        const mode = this.getSwathModeFromString(swathMode.value);
+        this.entityManager.clearSwathsByMode(mode);
+        this.updateSwathInfo();
+      });
+    }
+
+    // 주기적으로 Swath 정보 업데이트
+    setInterval(() => {
+      this.updateSwathInfo();
+    }, 1000);
+  }
+
+  /**
+   * 모드별 옵션 업데이트
+   */
+  private updateModeSpecificOptions(mode: string, container: HTMLDivElement | null): void {
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    switch (mode) {
+      case 'static':
+        container.innerHTML = '<div class="info">정적 Swath: 고정 위치와 파라미터로 생성됩니다.</div>';
+        break;
+      case 'realtime_tracking':
+        container.innerHTML = '<div class="info">실시간 추적: 위성 위치를 실시간으로 추적하여 Swath를 생성합니다.</div>';
+        break;
+      case 'predicted_path':
+        container.innerHTML = `
+          <label>
+            예측 시간 (시간):
+            <input type="number" id="predictedHours" value="4" min="1" max="24">
+          </label>
+        `;
+        break;
+      case 'historical':
+        container.innerHTML = '<div class="info">과거 경로: 과거 위성 경로를 기반으로 Swath를 생성합니다.</div>';
+        break;
+      case 'backend_api':
+        container.innerHTML = `
+          <label>
+            API Endpoint:
+            <input type="text" id="apiEndpoint" value="http://localhost:8000" placeholder="http://localhost:8000">
+          </label>
+          <label>
+            Simulation ID:
+            <input type="text" id="simulationId" value="" placeholder="simulation-123">
+          </label>
+        `;
+        break;
+      case 'custom_geometry':
+        container.innerHTML = `
+          <div class="info">사용자 정의 기하: 4개의 코너 좌표를 직접 입력하세요.</div>
+          <label>
+            Top Left (lon, lat):
+            <input type="text" id="customTopLeft" value="127.0, 37.5" placeholder="127.0, 37.5">
+          </label>
+          <label>
+            Top Right (lon, lat):
+            <input type="text" id="customTopRight" value="128.0, 37.5" placeholder="128.0, 37.5">
+          </label>
+          <label>
+            Bottom Right (lon, lat):
+            <input type="text" id="customBottomRight" value="128.0, 36.5" placeholder="128.0, 36.5">
+          </label>
+          <label>
+            Bottom Left (lon, lat):
+            <input type="text" id="customBottomLeft" value="127.0, 36.5" placeholder="127.0, 36.5">
+          </label>
+        `;
+        break;
+    }
+  }
+
+  /**
+   * 모드에 따라 Swath 추가
+   */
+  private async addSwathByMode(
+    mode: string,
+    options: any,
+    swathParams: any
+  ): Promise<void> {
+    try {
+      switch (mode) {
+        case 'static': {
+          // 현재 위성 위치 기반으로 Swath 생성
+          const currentPosition = this.entityManager.getCurrentSatellitePosition();
+          if (!currentPosition) {
+            alert('위성 위치를 가져올 수 없습니다. TLE가 활성화되어 있는지 확인하세요.');
+            return;
+          }
+
+          const geometry: SARSwathGeometry = {
+            centerLat: currentPosition.latitude,
+            centerLon: currentPosition.longitude,
+            heading: currentPosition.heading,
+            nearRange: swathParams.nearRange,
+            farRange: swathParams.farRange,
+            swathWidth: swathParams.swathWidth,
+            azimuthLength: swathParams.azimuthLength,
+            satelliteAltitude: currentPosition.altitude,
+          };
+          this.entityManager.addStaticSwath(geometry, options);
+          break;
+        }
+        case 'realtime_tracking':
+          this.entityManager.startRealtimeSwathTracking(swathParams, options);
+          break;
+        case 'predicted_path': {
+          const hoursInput = document.getElementById('predictedHours') as HTMLInputElement;
+          const hours = parseFloat(hoursInput?.value || '4');
+          this.entityManager.addPredictedSwathPath(hours);
+          break;
+        }
+        case 'historical':
+          // 과거 경로는 예측 경로와 동일한 방식으로 처리
+          console.warn('과거 경로 기능은 아직 구현되지 않았습니다.');
+          break;
+        case 'backend_api': {
+          const apiEndpoint = (document.getElementById('apiEndpoint') as HTMLInputElement)?.value || 'http://localhost:8000';
+          const simulationId = (document.getElementById('simulationId') as HTMLInputElement)?.value || '';
+          if (!simulationId) {
+            alert('Simulation ID를 입력하세요.');
+            return;
+          }
+          await this.entityManager.addBackendAPISwath(apiEndpoint, simulationId, options);
+          break;
+        }
+        case 'custom_geometry': {
+          const topLeft = (document.getElementById('customTopLeft') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
+          const topRight = (document.getElementById('customTopRight') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
+          const bottomRight = (document.getElementById('customBottomRight') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
+          const bottomLeft = (document.getElementById('customBottomLeft') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
+          
+          if (!topLeft || !topRight || !bottomRight || !bottomLeft) {
+            alert('모든 코너 좌표를 입력하세요.');
+            return;
+          }
+
+          const swathManager = this.entityManager.getSwathManager();
+          swathManager.addCustomGeometrySwath(
+            {
+              topLeft: [topLeft[0], topLeft[1]],
+              topRight: [topRight[0], topRight[1]],
+              bottomRight: [bottomRight[0], bottomRight[1]],
+              bottomLeft: [bottomLeft[0], bottomLeft[1]],
+            },
+            options
+          );
+          break;
+        }
+      }
+    } catch (error: any) {
+      console.error('Swath 추가 실패:', error);
+      alert('Swath 추가 실패: ' + error.message);
+    }
+  }
+
+  /**
+   * 문자열을 SwathMode enum으로 변환
+   */
+  private getSwathModeFromString(mode: string): SwathMode {
+    switch (mode) {
+      case 'static': return SwathMode.STATIC;
+      case 'realtime_tracking': return SwathMode.REALTIME_TRACKING;
+      case 'predicted_path': return SwathMode.PREDICTED_PATH;
+      case 'historical': return SwathMode.HISTORICAL;
+      case 'backend_api': return SwathMode.BACKEND_API;
+      case 'custom_geometry': return SwathMode.CUSTOM_GEOMETRY;
+      default: return SwathMode.STATIC;
+    }
+  }
+
+  /**
+   * 실시간 추적이 실행 중일 때 옵션 변경 시 즉시 적용
+   */
+  private applyRealtimeTrackingOptionsIfActive(): void {
+    if (!this.showSwathCheckbox || !this.showSwathCheckbox.checked) {
+      return;
+    }
+
+    const swathMode = document.getElementById('swathMode') as HTMLSelectElement;
+    if (!swathMode || swathMode.value !== 'realtime_tracking') {
+      return;
+    }
+
+    // 실시간 추적이 실행 중이면 중지하고 새 옵션으로 재시작
+    const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+    const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
+    const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+    const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+    const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+    const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+    const swathOutlineColor = document.getElementById('swathOutlineColor') as HTMLSelectElement;
+    const swathOutlineWidth = document.getElementById('swathOutlineWidth') as HTMLInputElement;
+    const swathShowLabel = document.getElementById('swathShowLabel') as HTMLInputElement;
+    const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
+    const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
+
+    // 기존 실시간 추적 중지
+    this.entityManager.stopRealtimeSwathTracking();
+
+    // 새 옵션으로 재시작
+    this.entityManager.startRealtimeSwathTracking(
+      {
+        nearRange: parseFloat(swathNearRange?.value || '200000'),
+        farRange: parseFloat(swathFarRange?.value || '800000'),
+        swathWidth: parseFloat(swathWidth?.value || '50000'),
+        azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+      },
+      {
+        color: swathColor?.value || 'CYAN',
+        alpha: parseFloat(swathAlpha?.value || '0.4'),
+        outlineColor: swathOutlineColor?.value || 'YELLOW',
+        outlineWidth: parseInt(swathOutlineWidth?.value || '2'),
+        showLabel: swathShowLabel?.checked || false,
+        maxSwaths: parseInt(swathMaxCount?.value || '50'),
+        updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+      }
+    );
+  }
+
+  /**
+   * Swath 정보 업데이트
+   */
+  private updateSwathInfo(): void {
+    const swathInfo = document.getElementById('swathInfo');
+    if (!swathInfo) return;
+
+    const swathManager = this.entityManager.getSwathManager();
+    const totalCount = swathManager.getSwathCount();
+    const modeCounts = [
+      { mode: SwathMode.STATIC, name: '정적' },
+      { mode: SwathMode.REALTIME_TRACKING, name: '실시간' },
+      { mode: SwathMode.PREDICTED_PATH, name: '예측' },
+      { mode: SwathMode.HISTORICAL, name: '과거' },
+      { mode: SwathMode.BACKEND_API, name: 'API' },
+      { mode: SwathMode.CUSTOM_GEOMETRY, name: '사용자정의' },
+    ];
+
+    const counts = modeCounts
+      .map(({ mode, name }) => {
+        const count = swathManager.getSwathCountByMode(mode);
+        return count > 0 ? `${name}: ${count}` : null;
+      })
+      .filter(Boolean)
+      .join(', ');
+
+    swathInfo.textContent = `Swath 개수: ${totalCount}${counts ? ` (${counts})` : ''}`;
   }
 }

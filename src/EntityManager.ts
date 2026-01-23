@@ -1,6 +1,7 @@
 import { SatelliteManager } from './SatelliteManager.js';
 import { SARSwathCalculator } from './utils/sar-swath-calculator.js';
-import { SARSwathGeometry } from './types/sar-swath.types.js';
+import { SARSwathGeometry, SwathMode } from './types/sar-swath.types.js';
+import { SwathManager } from './managers/SwathManager.js';
 
 /**
  * EntityManager - 엔티티 생성 및 관리
@@ -8,6 +9,7 @@ import { SARSwathGeometry } from './types/sar-swath.types.js';
 export class EntityManager {
   private viewer: any;
   private satelliteManager: SatelliteManager;
+  private swathManager: SwathManager;
   private entity: any;
   private position: any;
   private currentCartesian: any;
@@ -18,10 +20,12 @@ export class EntityManager {
   private showSwath: boolean;
   private swathGeometry: SARSwathGeometry | null;
   private lastSwathUpdateTime: number;
+  private realtimeSwathId: string | null;
 
   constructor(viewer: any, satelliteManager: SatelliteManager) {
     this.viewer = viewer;
     this.satelliteManager = satelliteManager;
+    this.swathManager = new SwathManager(viewer);
     this.entity = null;
     this.position = null;
     this.currentCartesian = null;
@@ -31,6 +35,7 @@ export class EntityManager {
     this.showSwath = false;
     this.swathGeometry = null;
     this.lastSwathUpdateTime = 0;
+    this.realtimeSwathId = null;
   }
 
   /**
@@ -128,14 +133,7 @@ export class EntityManager {
           // 위치 업데이트
           this.position.setValue(this.currentCartesian);
 
-          // Swath가 활성화되어 있으면 업데이트 (1초마다)
-          if (this.showSwath) {
-            const now = Date.now();
-            if (now - this.lastSwathUpdateTime > 1000) { // 1초마다 업데이트
-              this.updateSwathFromSatellitePosition();
-              this.lastSwathUpdateTime = now;
-            }
-          }
+          // SwathManager가 실시간 추적을 처리하므로 여기서는 제거
         }
       }
     };
@@ -268,7 +266,7 @@ export class EntityManager {
   }
 
   /**
-   * SAR Swath 표시/숨김 토글
+   * SAR Swath 표시/숨김 토글 (호환성 유지 - 실시간 추적 모드로 동작)
    */
   toggleSwath(show?: boolean): void {
     if (show !== undefined) {
@@ -278,25 +276,11 @@ export class EntityManager {
     }
 
     if (this.showSwath) {
-      // Swath가 활성화되면 위성 위치 기반으로 새로운 Swath 생성 (기존 것은 유지)
-      if (this.currentCartesian && this.entity) {
-        this.updateSwathFromSatellitePosition();
-      } else {
-        // 위성 위치가 아직 준비되지 않았으면 기본 위치로 생성
-        const defaultGeometry: SARSwathGeometry = {
-          centerLat: 0,
-          centerLon: 0,
-          heading: 0,
-          nearRange: 200000,
-          farRange: 800000,
-          swathWidth: 50000,
-          azimuthLength: 50000, // 더 크게
-        };
-        this.setSwathGeometry(defaultGeometry, true);
-      }
+      // 실시간 추적 모드로 시작
+      this.startRealtimeSwathTracking();
     } else {
-      // Swath 숨김 (기존 Swath는 유지하되, 더 이상 새로 생성하지 않음)
-      // removeSwathVisualization()을 호출하지 않아서 기존 Swath는 유지됨
+      // 실시간 추적 중지
+      this.stopRealtimeSwathTracking();
     }
   }
 
@@ -409,7 +393,169 @@ export class EntityManager {
    * 모든 Swath 제거 (외부에서 호출 가능)
    */
   clearAllSwaths(): void {
+    // 기존 방식과 SwathManager 방식 모두 제거
     this.removeSwathVisualization();
+    this.swathManager.clearAllSwaths();
+  }
+
+  /**
+   * ✅ 실시간 Swath 추적 시작
+   */
+  startRealtimeSwathTracking(
+    swathParams?: {
+      nearRange?: number;
+      farRange?: number;
+      swathWidth?: number;
+      azimuthLength?: number;
+    },
+    options?: any
+  ): void {
+    // 이미 실행 중이면 중지
+    if (this.realtimeSwathId) {
+      this.stopRealtimeSwathTracking();
+    }
+
+    // 위성 위치 getter 함수
+    const getSatellitePosition = () => {
+      if (!this.currentCartesian) return null;
+
+      const cartographic = Cesium.Cartographic.fromCartesian(this.currentCartesian);
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+      const altitude = cartographic.height;
+
+      // Heading 계산
+      let heading = 0;
+      if (this.satelliteManager.useTLE) {
+        const currentTime = this.viewer.clock.currentTime;
+        const position1 = this.satelliteManager.calculatePosition(currentTime);
+        const futureTime = Cesium.JulianDate.addSeconds(currentTime, 10, new Cesium.JulianDate());
+        const position2 = this.satelliteManager.calculatePosition(futureTime);
+        
+        if (position1 && position2) {
+          const dLon = (position2.longitude - position1.longitude) * Math.PI / 180;
+          const lat1Rad = position1.latitude * Math.PI / 180;
+          const lat2Rad = position2.latitude * Math.PI / 180;
+          
+          const y = Math.sin(dLon) * Math.cos(lat2Rad);
+          const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+          
+          heading = Cesium.Math.toDegrees(Math.atan2(y, x));
+          if (heading < 0) heading += 360;
+        }
+      }
+
+      return { latitude, longitude, altitude, heading };
+    };
+
+    // 실시간 추적 시작
+    this.realtimeSwathId = this.swathManager.addRealtimeTrackingSwath(
+      getSatellitePosition,
+      swathParams,
+      options
+    );
+
+    console.log('[EntityManager] 실시간 Swath 추적 시작:', this.realtimeSwathId);
+  }
+
+  /**
+   * ✅ 실시간 Swath 추적 중지
+   */
+  stopRealtimeSwathTracking(): void {
+    if (this.realtimeSwathId) {
+      this.swathManager.removeSwath(this.realtimeSwathId);
+      this.realtimeSwathId = null;
+      console.log('[EntityManager] 실시간 Swath 추적 중지');
+    }
+  }
+
+  /**
+   * ✅ 정적 Swath 추가
+   */
+  addStaticSwath(geometry: SARSwathGeometry, options?: any): string {
+    return this.swathManager.addStaticSwath(geometry, options);
+  }
+
+  /**
+   * ✅ 예측 경로 Swath 추가
+   */
+  addPredictedSwathPath(hours: number = 4): string[] {
+    if (!this.satelliteManager.useTLE) {
+      console.warn('[EntityManager] TLE가 없어 예측 경로를 생성할 수 없습니다.');
+      return [];
+    }
+
+    const startTime = this.viewer.clock.currentTime;
+    const sampleInterval = 5; // 5분
+    const numSamples = Math.floor((hours * 60) / sampleInterval);
+    const predictedPositions: any[] = [];
+
+    for (let i = 0; i <= numSamples; i++) {
+      const sampleTime = Cesium.JulianDate.addMinutes(
+        startTime,
+        i * sampleInterval,
+        new Cesium.JulianDate()
+      );
+      
+      const position = this.satelliteManager.calculatePosition(sampleTime);
+      if (position) {
+        // Heading 계산 (다음 포인트와 비교)
+        let heading = 0;
+        if (i < numSamples) {
+          const nextTime = Cesium.JulianDate.addMinutes(
+            startTime,
+            (i + 1) * sampleInterval,
+            new Cesium.JulianDate()
+          );
+          const nextPosition = this.satelliteManager.calculatePosition(nextTime);
+          
+          if (nextPosition) {
+            const dLon = (nextPosition.longitude - position.longitude) * Math.PI / 180;
+            const lat1Rad = position.latitude * Math.PI / 180;
+            const lat2Rad = nextPosition.latitude * Math.PI / 180;
+            
+            const y = Math.sin(dLon) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                      Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+            
+            heading = Cesium.Math.toDegrees(Math.atan2(y, x));
+            if (heading < 0) heading += 360;
+          }
+        }
+
+        predictedPositions.push({
+          time: Cesium.JulianDate.toDate(sampleTime).getTime(),
+          latitude: position.latitude,
+          longitude: position.longitude,
+          altitude: position.altitude,
+          heading,
+        });
+      }
+    }
+
+    return this.swathManager.addPredictedPathSwath(predictedPositions);
+  }
+
+  /**
+   * ✅ Backend API Swath 추가
+   */
+  async addBackendAPISwath(apiEndpoint: string, simulationId: string, options?: any): Promise<string[]> {
+    return await this.swathManager.addBackendAPISwath(apiEndpoint, simulationId, options);
+  }
+
+  /**
+   * ✅ 특정 모드 Swath 제거
+   */
+  clearSwathsByMode(mode: SwathMode): void {
+    this.swathManager.clearSwathsByMode(mode);
+  }
+
+  /**
+   * SwathManager 접근
+   */
+  getSwathManager(): SwathManager {
+    return this.swathManager;
   }
 
   /**
@@ -510,5 +656,67 @@ export class EntityManager {
    */
   isSwathVisible(): boolean {
     return this.showSwath;
+  }
+
+  /**
+   * ✅ 현재 위성 위치와 heading 반환
+   */
+  getCurrentSatellitePosition(): { latitude: number; longitude: number; altitude: number; heading: number } | null {
+    if (!this.currentCartesian) {
+      return null;
+    }
+
+    // 현재 위치를 위도/경도로 변환
+    const cartographic = Cesium.Cartographic.fromCartesian(this.currentCartesian);
+    const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+    const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+    const altitude = cartographic.height;
+
+    // Heading 계산
+    let heading = 0;
+    
+    // TLE 기반 속도 벡터 계산 (지표면 좌표 사용)
+    if (this.satelliteManager.useTLE) {
+      const currentTime = this.viewer.clock.currentTime;
+      const position1 = this.satelliteManager.calculatePosition(currentTime);
+      const futureTime = Cesium.JulianDate.addSeconds(currentTime, 10, new Cesium.JulianDate());
+      const position2 = this.satelliteManager.calculatePosition(futureTime);
+      
+      if (position1 && position2) {
+        const dLon = (position2.longitude - position1.longitude) * Math.PI / 180;
+        const lat1Rad = position1.latitude * Math.PI / 180;
+        const lat2Rad = position2.latitude * Math.PI / 180;
+        
+        const y = Math.sin(dLon) * Math.cos(lat2Rad);
+        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                  Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
+        
+        heading = Cesium.Math.toDegrees(Math.atan2(y, x));
+        if (heading < 0) heading += 360;
+      }
+    } else if (this.entity && this.entity.orientation && this.entity.orientation.getValue) {
+      // Orientation 기반 heading 계산 (대안)
+      const orientation = this.entity.orientation.getValue(Cesium.JulianDate.now());
+      if (orientation) {
+        const matrix = Cesium.Matrix3.fromQuaternion(orientation);
+        const forward = Cesium.Matrix3.getColumn(matrix, 0, new Cesium.Cartesian3());
+        
+        const up = Cesium.Cartographic.fromCartesian(this.currentCartesian);
+        const upVector = Cesium.Cartesian3.fromRadians(up.longitude, up.latitude, 0);
+        const east = Cesium.Cartesian3.cross(Cesium.Cartesian3.UNIT_Z, upVector, new Cesium.Cartesian3());
+        Cesium.Cartesian3.normalize(east, east);
+        const north = Cesium.Cartesian3.cross(upVector, east, new Cesium.Cartesian3());
+        Cesium.Cartesian3.normalize(north, north);
+        
+        const headingRad = Math.atan2(
+          Cesium.Cartesian3.dot(forward, east),
+          Cesium.Cartesian3.dot(forward, north)
+        );
+        heading = Cesium.Math.toDegrees(headingRad);
+        if (heading < 0) heading += 360;
+      }
+    }
+
+    return { latitude, longitude, altitude, heading };
   }
 }
