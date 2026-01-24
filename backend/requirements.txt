@@ -10,3 +10,6 @@ uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 python-multipart>=0.0.6
 httpx>=0.24.0  # 테스트 클라이언트용
+
+# 데이터베이스 의존성
+sqlalchemy>=2.0.0

@@ -7,6 +7,7 @@ FastAPI 기반 REST API 서버의 진입점입니다.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import config, chirp, echo, raw_data
+from api.database import init_db
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -16,6 +17,12 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """애플리케이션 시작 시 데이터베이스 초기화"""
+    init_db()
 
 # CORS 설정 (프론트엔드 연동 시 필요)
 app.add_middleware(
