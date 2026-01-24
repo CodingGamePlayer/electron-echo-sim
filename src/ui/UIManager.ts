@@ -1,5 +1,5 @@
-import { SatelliteManager } from '../SatelliteManager.js';
-import { EntityManager } from '../EntityManager.js';
+import { SatelliteManager } from '../satellite/SatelliteManager.js';
+import { EntityManager } from '../entity/EntityManager.js';
 import { TLEUIManager } from './TLEUIManager.js';
 import { SwathControlUIManager } from './SwathControlUIManager.js';
 import { SwathGroupsUIManager } from './SwathGroupsUIManager.js';

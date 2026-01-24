@@ -1,5 +1,5 @@
-import { SatelliteManager } from '../SatelliteManager.js';
-import { EntityManager } from '../EntityManager.js';
+import { SatelliteManager } from '../satellite/SatelliteManager.js';
+import { EntityManager } from '../entity/EntityManager.js';
 
 /**
  * TLE 입력 UI 관리

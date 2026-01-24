@@ -1,51 +1,34 @@
+import { TLEParser } from './TLEParser.js';
+
 /**
- * SatelliteManager - 위성 궤도 계산 및 위치 관리
+ * 위성 위치 계산기
  */
-export class SatelliteManager {
-  public tleData: string;
-  public useTLE: boolean;
+export class PositionCalculator {
+  private tleParser: TLEParser;
 
-  constructor(defaultTLE?: string) {
-    this.tleData = defaultTLE || '';
-    this.useTLE = true;
-  }
-
-  /**
-   * TLE 데이터 설정
-   */
-  setTLE(tle: string): void {
-    this.tleData = tle;
-  }
-
-  /**
-   * TLE 사용 여부 설정
-   */
-  setUseTLE(use: boolean): void {
-    this.useTLE = use;
+  constructor() {
+    this.tleParser = new TLEParser();
   }
 
   /**
    * TLE에서 위치 계산
    */
-  calculatePosition(time: any): { longitude: number; latitude: number; altitude: number } | null {
-    if (!this.useTLE || !this.tleData) {
+  calculatePosition(
+    tleData: string,
+    time: any,
+    headingOffset: number = 0
+  ): { longitude: number; latitude: number; altitude: number } | null {
+    if (!tleData) {
       return null;
     }
 
     try {
-      // TLE 파싱
-      const tleLines = this.tleData.trim().split('\n');
-      let line1: string, line2: string;
-      
-      if (tleLines.length === 2) {
-        line1 = tleLines[0];
-        line2 = tleLines[1];
-      } else if (tleLines.length === 3) {
-        line1 = tleLines[1];
-        line2 = tleLines[2];
-      } else {
-        throw new Error('TLE 형식이 올바르지 않습니다. 2줄 또는 3줄이 필요합니다.');
+      const parsed = this.tleParser.parseTLE(tleData);
+      if (!parsed) {
+        return null;
       }
+
+      const { line1, line2 } = parsed;
       
       // Satellite.js를 사용하여 위치 계산
       const satrec = (window as any).satellite.twoline2satrec(line1, line2);

@@ -1,6 +1,6 @@
-import { CesiumViewerManager } from './CesiumViewerManager.js';
-import { SatelliteManager } from './SatelliteManager.js';
-import { EntityManager } from './EntityManager.js';
+import { CesiumViewerManager } from './cesium/CesiumViewerManager.js';
+import { SatelliteManager } from './satellite/SatelliteManager.js';
+import { EntityManager } from './entity/EntityManager.js';
 import { UIManager } from './ui/UIManager.js';
 
 /**

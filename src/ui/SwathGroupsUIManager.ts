@@ -1,4 +1,4 @@
-import { EntityManager } from '../EntityManager.js';
+import { EntityManager } from '../entity/EntityManager.js';
 
 /**
  * Swath 그룹 사이드바 UI 관리
@@ -84,7 +84,7 @@ export class SwathGroupsUIManager {
       return;
     }
 
-    swathGroupsList.innerHTML = groups.map(group => {
+    swathGroupsList.innerHTML = groups.map((group: any) => {
       const createdAt = new Date(group.createdAt).toLocaleString('ko-KR');
       const endedAt = group.endedAt ? new Date(group.endedAt).toLocaleString('ko-KR') : null;
       const isInProgress = !group.endedAt;

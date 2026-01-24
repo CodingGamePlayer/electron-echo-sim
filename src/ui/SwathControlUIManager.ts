@@ -1,4 +1,4 @@
-import { EntityManager } from '../EntityManager.js';
+import { EntityManager } from '../entity/EntityManager.js';
 import { SARSwathGeometry } from '../types/sar-swath.types.js';
 
 /**
