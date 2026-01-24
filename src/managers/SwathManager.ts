@@ -54,7 +54,6 @@ export class SwathManager {
     // 최대 개수 제한 체크 (Swath 추가 후 호출)
     this.enforceMaxSwaths(opts.maxSwaths!);
 
-    console.log(`[SwathManager] 정적 Swath 생성: ${swathId}${groupId ? ` (그룹: ${groupId})` : ''}`, geometry);
     return swathId;
   }
 
@@ -90,7 +89,6 @@ export class SwathManager {
     // 초기 Swath 생성
     const initialPosition = satellitePositionGetter();
     if (!initialPosition) {
-      console.warn('[SwathManager] 초기 위성 위치를 가져올 수 없습니다.');
       return '';
     }
 
@@ -144,7 +142,6 @@ export class SwathManager {
     const intervalId = setInterval(updateHandler, opts.updateInterval);
     this.updateHandlers.set(swathId, () => clearInterval(intervalId));
 
-    console.log(`[SwathManager] 실시간 추적 Swath 시작: ${swathId}${groupId ? ` (그룹: ${groupId})` : ''}`);
     return swathId;
   }
 
@@ -208,7 +205,6 @@ export class SwathManager {
     // 최대 개수 제한 체크 (모든 Swath 추가 후 호출)
     this.enforceMaxSwaths(opts.maxSwaths!);
 
-    console.log(`[SwathManager] 예측 경로 Swath 생성: ${swathIds.length}개`);
     return swathIds;
   }
 
@@ -252,10 +248,8 @@ export class SwathManager {
         this.enforceMaxSwaths(opts.maxSwaths!);
       }
 
-      console.log(`[SwathManager] Backend API Swath 생성: ${swathIds.length}개`);
       return swathIds;
     } catch (error) {
-      console.error('[SwathManager] Backend API 호출 오류:', error);
       return [];
     }
   }
@@ -304,7 +298,6 @@ export class SwathManager {
     // 최대 개수 제한 체크 (Swath 추가 후 호출)
     this.enforceMaxSwaths(opts.maxSwaths!);
     
-    console.log(`[SwathManager] 사용자 정의 Swath 생성: ${swathId}`);
     return swathId;
   }
 
@@ -424,7 +417,6 @@ export class SwathManager {
       this.viewer.scene.primitives.add(primitive);
       return primitive;
     } catch (error) {
-      console.warn('[SwathManager] GroundPrimitive 생성 실패:', error);
       return null;
     }
   }
@@ -435,7 +427,6 @@ export class SwathManager {
   removeSwath(swathId: string): boolean {
     const instance = this.swaths.get(swathId);
     if (!instance) {
-      console.warn(`[SwathManager] Swath ${swathId}를 찾을 수 없습니다.`);
       return false;
     }
 
@@ -449,7 +440,6 @@ export class SwathManager {
       this.updateHandlers.delete(swathId);
     }
 
-    console.log(`[SwathManager] Swath 제거: ${swathId}`);
     return true;
   }
 
@@ -465,7 +455,7 @@ export class SwathManager {
       try {
         this.viewer.entities.remove(instance.entity);
       } catch (error) {
-        console.warn('[SwathManager] Entity 제거 실패:', error);
+        // 무시
       }
     }
 
@@ -474,7 +464,7 @@ export class SwathManager {
       try {
         this.viewer.scene.primitives.remove(instance.primitive);
       } catch (error) {
-        console.warn('[SwathManager] Primitive 제거 실패:', error);
+        // 무시
       }
     }
 
@@ -483,7 +473,7 @@ export class SwathManager {
       try {
         this.viewer.entities.remove(instance.label);
       } catch (error) {
-        console.warn('[SwathManager] Label 제거 실패:', error);
+        // 무시
       }
     }
   }
@@ -494,7 +484,6 @@ export class SwathManager {
   clearAllSwaths(): void {
     const swathIds = Array.from(this.swaths.keys());
     swathIds.forEach(id => this.removeSwath(id));
-    console.log('[SwathManager] 모든 Swath 제거 완료');
   }
 
   /**
@@ -506,7 +495,6 @@ export class SwathManager {
       .map(instance => instance.id);
     
     swathIds.forEach(id => this.removeSwath(id));
-    console.log(`[SwathManager] ${mode} 모드 Swath 제거: ${swathIds.length}개`);
   }
 
   /**
@@ -522,8 +510,6 @@ export class SwathManager {
     // 오래된 것부터 삭제
     const toRemove = sortedSwaths.slice(0, this.swaths.size - maxSwaths);
     toRemove.forEach(instance => this.removeSwath(instance.id));
-
-    console.log(`[SwathManager] 최대 개수 초과, ${toRemove.length}개 자동 삭제`);
   }
 
   /**

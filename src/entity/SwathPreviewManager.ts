@@ -54,7 +54,6 @@ export class SwathPreviewManager {
 
     const currentCartesian = this.entityManager.getCurrentCartesian();
     if (!currentCartesian) {
-      console.warn('[SwathPreviewManager] 미리보기 생성 실패: 위성 위치를 가져올 수 없습니다.');
       return;
     }
 
@@ -104,7 +103,6 @@ export class SwathPreviewManager {
     }
 
     this.lastPreviewUpdateTime = Date.now();
-    console.log('[SwathPreviewManager] Swath 미리보기 업데이트:', this.previewSwathId);
   }
 
   /**
@@ -114,7 +112,6 @@ export class SwathPreviewManager {
     if (this.previewSwathId) {
       this.swathManager.removeSwath(this.previewSwathId);
       this.previewSwathId = null;
-      console.log('[SwathPreviewManager] Swath 미리보기 제거');
     }
   }
 

@@ -74,8 +74,6 @@ export class SwathTrackingManager {
     if (this.realtimeSwathId) {
       this.swathGroupManager.addSwathToGroup(groupId, this.realtimeSwathId);
     }
-
-    console.log('[SwathTrackingManager] 실시간 Swath 추적 시작:', this.realtimeSwathId, '그룹:', groupId);
   }
 
   /**
@@ -86,7 +84,6 @@ export class SwathTrackingManager {
       this.swathGroupManager.endRealtimeGroup();
       this.swathManager.removeSwath(this.realtimeSwathId);
       this.realtimeSwathId = null;
-      console.log('[SwathTrackingManager] 실시간 Swath 추적 중지');
     }
   }
 }
