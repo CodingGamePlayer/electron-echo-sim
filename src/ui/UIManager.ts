@@ -37,6 +37,10 @@ export class UIManager {
       this.entityManager.showSwathsByGroupId(selectedGroupId);
     });
     this.swathGroupsUIManager.initialize();
-    this.sarConfigUIManager.initialize();
+    
+    // SAR 설정 불러오기 시 Swath 제어 탭에 자동 적용
+    this.sarConfigUIManager.initialize((sarConfig) => {
+      this.swathControlUIManager.applySarConfigToSwathParams(sarConfig);
+    });
   }
 }

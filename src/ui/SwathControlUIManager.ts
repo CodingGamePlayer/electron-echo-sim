@@ -1,5 +1,6 @@
 import { EntityManager } from '../entity/EntityManager.js';
 import { SARSwathGeometry } from '../types/sar-swath.types.js';
+import { calculateSwathParamsFromSarConfig, validateSarConfig, SarSystemConfig, SwathParams } from '../utils/swath-param-calculator.js';
 
 /**
  * Swath 제어 UI 관리
@@ -382,5 +383,44 @@ export class SwathControlUIManager {
         alpha: parseFloat(swathAlpha?.value || '0.3'),
       }
     );
+  }
+
+  /**
+   * SAR 설정에서 계산된 Swath 파라미터를 UI에 적용
+   * 
+   * @param sarConfig SAR 시스템 설정
+   */
+  applySarConfigToSwathParams(sarConfig: SarSystemConfig): void {
+    try {
+      // SAR 설정 값 검증
+      validateSarConfig(sarConfig);
+      
+      // Swath 파라미터 계산
+      const swathParams = calculateSwathParamsFromSarConfig(sarConfig);
+      
+      // UI 입력 필드 업데이트
+      const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+      const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+      const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+      
+      if (swathNearRange) {
+        swathNearRange.value = Math.round(swathParams.nearRange).toString();
+      }
+      if (swathWidth) {
+        swathWidth.value = Math.round(swathParams.swathWidth).toString();
+      }
+      if (swathAzimuthLength) {
+        swathAzimuthLength.value = Math.round(swathParams.azimuthLength).toString();
+      }
+      
+      // 실시간 추적이 실행 중이면 옵션 재적용
+      this.applyRealtimeTrackingOptionsIfActive();
+      
+      // 미리보기 업데이트
+      this.updateSwathPreview();
+    } catch (error: any) {
+      console.error('SAR 설정에서 Swath 파라미터 계산 실패:', error);
+      alert('SAR 설정 적용 실패: ' + error.message);
+    }
   }
 }

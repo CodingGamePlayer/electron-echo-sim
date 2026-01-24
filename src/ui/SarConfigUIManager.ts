@@ -22,6 +22,9 @@ interface SarSystemConfig {
   beam_id: string;
 }
 
+// Swath 계산에 필요한 최소 SAR 설정 타입
+import type { SarSystemConfig as SwathCalcSarConfig } from '../utils/swath-param-calculator.js';
+
 interface SarConfigDetail extends SarSystemConfig {
   id: string;
   name: string;
@@ -50,10 +53,13 @@ const API_BASE_URL = 'http://localhost:8000/api';
  * SAR 시스템 설정 UI 관리
  */
 export class SarConfigUIManager {
+  private onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void;
+
   /**
    * SAR 설정 UI 초기화
    */
-  initialize(): void {
+  initialize(onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void): void {
+    this.onConfigLoaded = onConfigLoaded;
     this.setupHandlers();
     this.loadSarConfigList();
   }
@@ -149,6 +155,22 @@ export class SarConfigUIManager {
         const nameInput = document.getElementById('sarConfigName') as HTMLInputElement;
         if (nameInput) {
           nameInput.value = record.name;
+        }
+
+        // SAR 설정을 Swath 제어 탭에 적용
+        if (this.onConfigLoaded) {
+          // Swath 계산에 필요한 필드만 추출 (rank 계산을 위해 prf와 taup 포함)
+          const swathConfig: SwathCalcSarConfig = {
+            fc: record.fc,
+            swst: record.swst,
+            swl: record.swl,
+            orbit_height: record.orbit_height,
+            antenna_width: record.antenna_width,
+            antenna_height: record.antenna_height,
+            prf: record.prf,
+            taup: record.taup
+          };
+          this.onConfigLoaded(swathConfig);
         }
 
         alert('설정을 불러왔습니다.');
