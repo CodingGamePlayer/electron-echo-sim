@@ -38,6 +38,8 @@ export interface SarSystemConfig {
   
   // 빔 파라미터
   beam_id: string;  // 빔 ID
+  el_angle?: number;  // Elevation angle (deg) - rank 계산에 사용
+  az_angle?: number;  // Azimuth angle (deg) - rank 계산에 사용
 }
 
 /**

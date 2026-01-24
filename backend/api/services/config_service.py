@@ -60,6 +60,8 @@ def create_config(db: Session, config_data: SarConfigCreateRequest) -> SarConfig
         Tsys=config_data.Tsys,
         adc_bits=config_data.adc_bits,
         beam_id=config_data.beam_id,
+        el_angle=config_data.el_angle,
+        az_angle=config_data.az_angle,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow()
     )
@@ -186,7 +188,7 @@ def update_config(db: Session, config_id: str, config_data: SarConfigUpdateReque
         "fc", "bw", "fs", "taup", "prf", "swst", "swl", "orbit_height",
         "antenna_width", "antenna_height", "antenna_roll_angle",
         "antenna_pitch_angle", "antenna_yaw_angle", "Pt", "G_recv",
-        "NF", "Loss", "Tsys", "adc_bits", "beam_id"
+        "NF", "Loss", "Tsys", "adc_bits", "beam_id", "el_angle", "az_angle"
     }
     
     if any(key in update_data for key in config_params):

@@ -20,6 +20,8 @@ interface SarSystemConfig {
   Tsys: number;
   adc_bits: number;
   beam_id: string;
+  el_angle?: number;  // Elevation angle (deg) - rank 계산에 사용
+  az_angle?: number;  // Azimuth angle (deg) - rank 계산에 사용
 }
 
 // Swath 계산에 필요한 최소 SAR 설정 타입
@@ -159,7 +161,7 @@ export class SarConfigUIManager {
 
         // SAR 설정을 Swath 제어 탭에 적용
         if (this.onConfigLoaded) {
-          // Swath 계산에 필요한 필드만 추출 (rank 계산을 위해 prf와 taup 포함)
+          // Swath 계산에 필요한 필드만 추출 (rank 계산을 위해 prf, taup, el_angle, az_angle 포함)
           const swathConfig: SwathCalcSarConfig = {
             fc: record.fc,
             swst: record.swst,
@@ -168,7 +170,9 @@ export class SarConfigUIManager {
             antenna_width: record.antenna_width,
             antenna_height: record.antenna_height,
             prf: record.prf,
-            taup: record.taup
+            taup: record.taup,
+            el_angle: (record as any).el_angle,
+            az_angle: (record as any).az_angle
           };
           this.onConfigLoaded(swathConfig);
         }

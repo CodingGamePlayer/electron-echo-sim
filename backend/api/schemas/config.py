@@ -52,6 +52,8 @@ class SarSystemConfigRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: str = Field("Beam0000", description="빔 ID")
+    el_angle: float = Field(0.0, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: float = Field(0.0, description="Azimuth angle (deg) - rank 계산에 사용")
     
     def to_sar_system_config(self) -> SarSystemConfig:
         """SarSystemConfig 객체로 변환"""
@@ -146,6 +148,8 @@ class SarConfigCreateRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: str = Field("Beam0000", description="빔 ID")
+    el_angle: float = Field(0.0, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: float = Field(0.0, description="Azimuth angle (deg) - rank 계산에 사용")
     
     def to_sar_system_config(self) -> SarSystemConfig:
         """SarSystemConfig 객체로 변환"""
@@ -234,6 +238,8 @@ class SarConfigUpdateRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: Optional[str] = Field(None, description="빔 ID")
+    el_angle: Optional[float] = Field(None, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: Optional[float] = Field(None, description="Azimuth angle (deg) - rank 계산에 사용")
 
 
 class SarConfigItem(BaseModel):
@@ -286,6 +292,8 @@ class SarConfigDetail(SarConfigItem):
     
     # 빔 파라미터
     beam_id: str
+    el_angle: float
+    az_angle: float
     
     model_config = ConfigDict(from_attributes=True)
 

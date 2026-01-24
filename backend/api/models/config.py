@@ -61,6 +61,8 @@ class SarConfigModel(Base):
     
     # 빔 파라미터
     beam_id = Column(String, default="Beam0000")  # 빔 ID
+    el_angle = Column(Float, nullable=True, default=0.0)  # Elevation angle (deg) - rank 계산에 사용
+    az_angle = Column(Float, nullable=True, default=0.0)  # Azimuth angle (deg) - rank 계산에 사용
     
     def __repr__(self):
         return f"<SarConfigModel(id={self.id}, name={self.name})>"

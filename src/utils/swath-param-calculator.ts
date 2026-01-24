@@ -19,6 +19,8 @@ export interface SarSystemConfig {
   antenna_height: number;  // 안테나 높이 (m)
   prf?: number;            // 펄스 반복 주파수 (Hz) - rank 계산에 필요
   taup?: number;            // 펄스 폭 (s) - rank 계산에 필요
+  el_angle?: number;       // Elevation angle (deg) - rank 계산에 사용 (있으면 더 정확)
+  az_angle?: number;       // Azimuth angle (deg) - rank 계산에 사용
 }
 
 // Swath 파라미터 인터페이스
@@ -32,21 +34,26 @@ export interface SwathParams {
 /**
  * Rank 추정
  * 
- * Look angle을 기본값(30도)으로 가정하여 rank를 추정합니다.
+ * el_angle이 있으면 사용하고, 없으면 Look angle을 기본값(30도)으로 가정하여 rank를 추정합니다.
  * rank는 레이더 모호성(ambiguity)을 나타내는 펄스 번호입니다.
  * 
  * @param swst 샘플링 윈도우 시작 시간 (s)
  * @param prf 펄스 반복 주파수 (Hz)
  * @param orbitHeight 궤도 높이 (m)
- * @param lookAngleDeg Look angle (deg, 기본값: 30도)
+ * @param elAngleDeg Elevation angle (deg, 있으면 사용, 없으면 기본값 30도)
  * @returns 추정된 rank
  */
 function estimateRank(
   swst: number,
   prf: number,
   orbitHeight: number,
-  lookAngleDeg: number = 30
+  elAngleDeg?: number
 ): number {
+  // el_angle이 있고 0이 아니면 사용, 없거나 0이면 기본값 30도 사용
+  // el_angle=0.0은 유효하지 않은 look angle일 수 있으므로 기본값 사용
+  // el_angle은 빔의 기본 방향이므로 look angle의 근사값으로 사용 가능
+  const lookAngleDeg = (elAngleDeg !== undefined && elAngleDeg !== 0) ? elAngleDeg : 30;
+  
   // Look angle을 라디안으로 변환
   const lookAngleRad = (lookAngleDeg * Math.PI) / 180;
   
@@ -144,9 +151,8 @@ export function calculateSwathParamsFromSarConfig(sarConfig: SarSystemConfig): S
     return calculateSwathParamsLegacy(sarConfig);
   }
   
-  // 1. Rank 추정 (Look angle 30도 기본값 가정)
-  const DEFAULT_LOOK_ANGLE_DEG = 30;
-  const rank = estimateRank(sarConfig.swst, prf, sarConfig.orbit_height, DEFAULT_LOOK_ANGLE_DEG);
+  // 1. Rank 추정 (el_angle이 있으면 사용, 없으면 기본값 30도)
+  const rank = estimateRank(sarConfig.swst, prf, sarConfig.orbit_height, sarConfig.el_angle);
   
   // 2. Near Range 계산 (rank 기반)
   // min_dist_swst = 0.5 * c * (rank / prf + swst)
