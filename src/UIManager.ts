@@ -16,6 +16,7 @@ export class UIManager {
   private staticModeControls: HTMLDivElement | null;
   private staticAddSwathBtn: HTMLButtonElement | null;
   private isRealtimeTrackingActive: boolean;
+  private swathGroupsToggleFromTab: HTMLButtonElement | null;
 
   constructor(satelliteManager: SatelliteManager, entityManager: EntityManager) {
     this.satelliteManager = satelliteManager;
@@ -28,6 +29,7 @@ export class UIManager {
     this.staticModeControls = null;
     this.staticAddSwathBtn = null;
     this.isRealtimeTrackingActive = false;
+    this.swathGroupsToggleFromTab = null;
   }
 
   /**
@@ -562,16 +564,19 @@ export class UIManager {
    */
   private setupSwathGroupsSidebar(): void {
     const swathGroupsSidebar = document.getElementById('swathGroupsSidebar');
-    const swathGroupsToggle = document.getElementById('swathGroupsToggle');
+    this.swathGroupsToggleFromTab = document.getElementById('swathGroupsToggleFromTab') as HTMLButtonElement;
     
-    if (swathGroupsToggle) {
-      swathGroupsToggle.addEventListener('click', () => {
+    if (this.swathGroupsToggleFromTab) {
+      this.swathGroupsToggleFromTab.addEventListener('click', () => {
         if (swathGroupsSidebar) {
           swathGroupsSidebar.classList.toggle('collapsed');
-          swathGroupsToggle.textContent = swathGroupsSidebar.classList.contains('collapsed') ? '▶' : '◀';
+          this.updateSwathGroupsToggleButton();
         }
       });
     }
+    
+    // 초기 버튼 상태 업데이트
+    this.updateSwathGroupsToggleButton();
     
     // 초기 그룹 목록 업데이트
     this.updateSwathGroupsList();
@@ -580,6 +585,17 @@ export class UIManager {
     setInterval(() => {
       this.updateSwathGroupsList();
     }, 1000);
+  }
+
+  /**
+   * Swath 그룹 사이드바 토글 버튼 상태 업데이트
+   */
+  private updateSwathGroupsToggleButton(): void {
+    const swathGroupsSidebar = document.getElementById('swathGroupsSidebar');
+    if (this.swathGroupsToggleFromTab && swathGroupsSidebar) {
+      const isCollapsed = swathGroupsSidebar.classList.contains('collapsed');
+      this.swathGroupsToggleFromTab.textContent = isCollapsed ? '펼치기' : '접기';
+    }
   }
 
   /**
