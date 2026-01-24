@@ -45,4 +45,9 @@ desktop.ini
 # 빌드/배포
 build/
 dist/
-*.egg-info/
+*.egg-info
+
+# 데이터베이스 파일
+*.db
+*.db-shm
+*.db-wal/

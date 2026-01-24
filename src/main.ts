@@ -1,12 +1,14 @@
 import { app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+import { DatabaseManager } from './database/DatabaseManager.js';
 
 // ES 모듈에서 __dirname 대체
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
+let databaseManager: DatabaseManager | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -39,6 +41,15 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // 데이터베이스 초기화
+  try {
+    databaseManager = new DatabaseManager();
+    databaseManager.initialize();
+    console.log('[Main] 데이터베이스 초기화 완료');
+  } catch (error) {
+    console.error('[Main] 데이터베이스 초기화 실패:', error);
+  }
+
   createWindow();
 
   app.on('activate', () => {
@@ -49,7 +60,21 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // 데이터베이스 연결 종료
+  if (databaseManager) {
+    databaseManager.close();
+    databaseManager = null;
+  }
+
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// 애플리케이션 종료 전 정리
+app.on('before-quit', () => {
+  if (databaseManager) {
+    databaseManager.close();
+    databaseManager = null;
   }
 });

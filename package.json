@@ -20,6 +20,7 @@
     "node": ">=22.0.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^25.0.10",
     "concurrently": "^9.1.2",
     "electron": "^40.0.0",
@@ -28,6 +29,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
-    "cesium": "^1.137.0"
+    "cesium": "^1.137.0",
+    "better-sqlite3": "^11.7.0"
   }
 }
