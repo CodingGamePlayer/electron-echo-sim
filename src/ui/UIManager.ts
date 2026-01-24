@@ -34,9 +34,9 @@ export class UIManager {
     );
     this.swathGroupsUIManager = new SwathGroupsUIManager(entityManager);
     
-    // Signal 시각화 패널 초기화
-    this.signalVisualizationPanel = new SignalVisualizationPanel('signalResultsPanel');
-    this.swathControlUIManager.setSignalVisualizationPanel(this.signalVisualizationPanel);
+              // Signal 시각화 패널 초기화
+              this.signalVisualizationPanel = new SignalVisualizationPanel();
+              this.swathControlUIManager.setSignalVisualizationPanel(this.signalVisualizationPanel);
   }
 
   /**

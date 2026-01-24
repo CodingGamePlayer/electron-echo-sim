@@ -262,17 +262,7 @@ export class SwathControlUIManager {
    * SAR 설정 검증
    */
   private validateSarConfig(sarConfig: any): void {
-    // 나이키스트 샘플링 조건 검증: fs >= 2 * bw
-    if (sarConfig.fs < 2 * sarConfig.bw) {
-      throw new Error(
-        `샘플링 주파수(fs=${sarConfig.fs.toExponential(2)} Hz)는 ` +
-        `나이키스트율(2*bw=${(2 * sarConfig.bw).toExponential(2)} Hz) 이상이어야 합니다. ` +
-        `현재 설정: fs=${(sarConfig.fs / 1e6).toFixed(1)} MHz, bw=${(sarConfig.bw / 1e6).toFixed(1)} MHz. ` +
-        `fs를 최소 ${((2 * sarConfig.bw) / 1e6).toFixed(1)} MHz 이상으로 설정하세요.`
-      );
-    }
-
-    // 기본 검증
+    // 기본 검증만 유지
     if (sarConfig.fs <= 0 || sarConfig.bw <= 0) {
       throw new Error('샘플링 주파수(fs)와 대역폭(bw)은 0보다 커야 합니다.');
     }
@@ -280,6 +270,8 @@ export class SwathControlUIManager {
     if (sarConfig.fs <= sarConfig.bw) {
       throw new Error('샘플링 주파수(fs)는 대역폭(bw)보다 커야 합니다.');
     }
+    
+    // 나이키스트 샘플링 검증 제거 (백엔드에서 경고로 처리)
   }
 
   /**
@@ -311,18 +303,7 @@ export class SwathControlUIManager {
       throw new Error(`Chirp 신호 생성 실패: ${error.message}`);
     }
 
-    // 2. Swath → 타겟 변환
-    const targets = convertSwathToTargets(geometry, {
-      rangeResolution: 1000,    // 1km 해상도
-      azimuthResolution: 1000,
-      defaultReflectivity: 1.0
-    });
-
-    if (targets.length === 0) {
-      throw new Error('타겟이 생성되지 않았습니다.');
-    }
-
-    // 3. 위성 상태 가져오기
+    // 2. 위성 상태 가져오기 (타겟 생성 전에 필요)
     const satelliteState = getCurrentSatelliteStateForEcho(
       this.entityManager,
       this.satelliteManager,
@@ -332,16 +313,58 @@ export class SwathControlUIManager {
       throw new Error('위성 위치를 가져올 수 없습니다.');
     }
 
+    // 3. Swath → 타겟 변환 (샘플링 윈도우 내에 배치)
+    const targets = convertSwathToTargets(geometry, {
+      rangeResolution: 1000,    // 1km 해상도
+      azimuthResolution: 1000,
+      defaultReflectivity: 100.0,  // 반사도 증가 (백엔드 테스트와 동일하게)
+      satellitePosition: satelliteState.position as [number, number, number],
+      sarConfig: sarConfig
+    });
+
+    if (targets.length === 0) {
+      throw new Error('타겟이 생성되지 않았습니다.');
+    }
+
+    console.log('타겟 생성 완료:', {
+      targetCount: targets.length,
+      firstTarget: targets[0],
+      geometry: geometry
+    });
+
+    console.log('위성 상태:', {
+      position: satelliteState.position,
+      velocity: satelliteState.velocity,
+      beamDirection: satelliteState.beam_direction
+    });
+
     // 4. Echo Signal 생성
     let echoResult: EchoSimulationResponse;
     try {
+      console.log('Echo API 호출 시작...', {
+        config: configRequest,
+        targetCount: targets.length,
+        satelliteState: satelliteState
+      });
       echoResult = await simulateEcho(configRequest, targets, satelliteState);
+      console.log('Echo API 응답:', {
+        num_samples: echoResult.num_samples,
+        shape: echoResult.shape,
+        dataLength: echoResult.data.length
+      });
     } catch (error: any) {
+      console.error('Echo API 오류 상세:', error);
       throw new Error(`Echo 신호 생성 실패: ${error.message}`);
     }
 
-    // 5. 결과 시각화
-    this.displaySignalResults(chirpResult, echoResult, sarConfig);
+      // 5. 결과 시각화
+      console.log('Signal 생성 완료:', {
+        chirpSamples: chirpResult.num_samples,
+        echoSamples: echoResult.num_samples,
+        chirpShape: chirpResult.shape,
+        echoShape: echoResult.shape
+      });
+      this.displaySignalResults(chirpResult, echoResult, sarConfig);
   }
 
   /**
@@ -373,12 +396,31 @@ export class SwathControlUIManager {
       const echoStats = SignalDataProcessor.computeStatistics(echoData);
 
       // 시각화
-      this.signalVisualizationPanel.displayChirpSignal(chirpData, config);
-      this.signalVisualizationPanel.displayEchoSignal(echoData, config);
-      this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
-
-      // 패널 표시
+      console.log('Signal 데이터 디코딩 완료:', {
+        chirpSamples: chirpData.real.length,
+        echoSamples: echoData.real.length,
+        chirpMax: chirpStats.max,
+        echoMax: echoStats.max
+      });
+      
+      // 사이드바를 먼저 열고, 그 다음에 Canvas를 그립니다
+      if (!this.signalVisualizationPanel) {
+        console.warn('Signal 시각화 패널이 설정되지 않았습니다.');
+        return;
+      }
+      
       this.signalVisualizationPanel.show();
+      
+      // 사이드바가 완전히 렌더링된 후 Canvas 그리기
+      setTimeout(() => {
+        if (this.signalVisualizationPanel) {
+      this.signalVisualizationPanel.displayChirpSignal(chirpData, config, { normalize: false });
+      // Echo Signal은 값이 매우 작으므로 정규화하여 표시 (최대값으로 나누어 0~1 범위로)
+      this.signalVisualizationPanel.displayEchoSignal(echoData, config, { normalize: true });
+      this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
+          console.log('Signal 패널 표시 완료');
+        }
+      }, 100);
     } catch (error: any) {
       console.error('Signal 시각화 실패:', error);
       throw new Error(`Signal 시각화 실패: ${error.message}`);

@@ -170,17 +170,7 @@ export class SarConfigUIManager {
         // 현재 설정 저장
         this.currentSarConfig = record;
 
-        // SAR 설정 검증 (경고만 표시)
-        const minFs = 2 * record.bw;
-        if (record.fs < minFs) {
-          const warningMsg = 
-            `경고: 샘플링 주파수(fs=${(record.fs / 1e6).toFixed(1)} MHz)가 ` +
-            `나이키스트율(${(minFs / 1e6).toFixed(1)} MHz)보다 작습니다. ` +
-            `Signal 생성 시 오류가 발생할 수 있습니다. ` +
-            `fs를 최소 ${(minFs / 1e6).toFixed(1)} MHz 이상으로 설정하는 것을 권장합니다.`;
-          console.warn(warningMsg);
-          // 경고는 콘솔에만 표시하고 사용자에게는 알리지 않음 (설정 불러오기는 성공)
-        }
+        // 나이키스트 샘플링 검증 제거 (백엔드에서 경고로 처리)
 
         // SAR 설정을 Swath 제어 탭에 적용
         if (this.onConfigLoaded) {

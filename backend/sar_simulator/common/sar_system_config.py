@@ -6,6 +6,7 @@ SAR 시스템의 파라미터를 관리하는 클래스입니다.
 
 from dataclasses import dataclass
 from typing import Optional
+import warnings
 from sar_simulator.common.constants import LIGHT_SPEED
 
 
@@ -75,9 +76,15 @@ class SarSystemConfig:
         if self.orbit_height <= 0:
             raise ValueError("orbit_height (궤도 높이)는 0보다 커야 합니다.")
         
-        # 나이키스트 샘플링 검증
+        # 나이키스트 샘플링 검증 (경고로 처리 - 원본 SSP 값 허용)
         if self.fs < 2 * self.bw:
-            raise ValueError(f"샘플링 주파수(fs={self.fs})는 나이키스트율(2*bw={2*self.bw}) 이상이어야 합니다.")
+            warnings.warn(
+                f"나이키스트 샘플링 조건 위반: 샘플링 주파수(fs={self.fs:.2e} Hz)는 "
+                f"나이키스트율(2*bw={2*self.bw:.2e} Hz) 이상이어야 합니다. "
+                f"원본 SSP 값을 사용하는 경우 이 경고는 무시할 수 있습니다.",
+                UserWarning,
+                stacklevel=2
+            )
     
     def _calculate_derived_params(self):
         """파생 파라미터 계산"""
