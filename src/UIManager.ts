@@ -17,6 +17,7 @@ export class UIManager {
   private staticAddSwathBtn: HTMLButtonElement | null;
   private isRealtimeTrackingActive: boolean;
   private swathGroupsToggleFromTab: HTMLButtonElement | null;
+  private selectedGroupId: string | null;
 
   constructor(satelliteManager: SatelliteManager, entityManager: EntityManager) {
     this.satelliteManager = satelliteManager;
@@ -30,6 +31,7 @@ export class UIManager {
     this.staticAddSwathBtn = null;
     this.isRealtimeTrackingActive = false;
     this.swathGroupsToggleFromTab = null;
+    this.selectedGroupId = null;
   }
 
   /**
@@ -276,6 +278,9 @@ export class UIManager {
       this.updateSwathPreview();
       // 그룹 목록 업데이트
       this.updateSwathGroupsList();
+      
+      // 선택된 그룹 상태 유지
+      this.entityManager.showSwathsByGroupId(this.selectedGroupId);
     });
     
     // 초기 모드에 따라 컨트롤 표시/숨김 설정
@@ -333,6 +338,14 @@ export class UIManager {
         satelliteAltitude: currentPosition.altitude,
       };
       this.entityManager.addStaticSwath(geometry, options);
+      
+      // 그룹 목록 업데이트
+      this.updateSwathGroupsList();
+      
+      // 선택된 그룹이 있으면 해당 그룹의 Swath만 표시 (새로 추가된 Swath도 포함)
+      if (this.selectedGroupId) {
+        this.entityManager.showSwathsByGroupId(this.selectedGroupId);
+      }
     } catch (error: any) {
       console.error('Swath 추가 실패:', error);
       alert('Swath 추가 실패: ' + error.message);
@@ -385,6 +398,14 @@ export class UIManager {
     );
     // 그룹 목록 업데이트
     this.updateSwathGroupsList();
+    
+    // 선택된 그룹이 있으면 해당 그룹의 Swath만 표시
+    if (this.selectedGroupId) {
+      this.entityManager.showSwathsByGroupId(this.selectedGroupId);
+    } else {
+      // 선택된 그룹이 없으면 모든 Swath 표시
+      this.entityManager.showSwathsByGroupId(null);
+    }
   }
 
   /**
@@ -430,6 +451,14 @@ export class UIManager {
       this.updateRealtimeTrackingButton();
       // 그룹 목록 업데이트
       this.updateSwathGroupsList();
+      
+      // 선택된 그룹이 있으면 해당 그룹의 Swath만 표시
+      if (this.selectedGroupId) {
+        this.entityManager.showSwathsByGroupId(this.selectedGroupId);
+      } else {
+        // 선택된 그룹이 없으면 모든 Swath 표시
+        this.entityManager.showSwathsByGroupId(null);
+      }
     });
   }
 
@@ -481,14 +510,8 @@ export class UIManager {
             }
           );
           
-          // 그룹 목록 업데이트
-          this.updateSwathGroupsList();
-      
       // 미리보기 다시 표시
       this.updateSwathPreview();
-      
-      // 그룹 목록 업데이트
-      this.updateSwathGroupsList();
     });
   }
 
@@ -498,11 +521,22 @@ export class UIManager {
   private setupSwathGroupsSidebar(): void {
     const swathGroupsSidebar = document.getElementById('swathGroupsSidebar');
     this.swathGroupsToggleFromTab = document.getElementById('swathGroupsToggleFromTab') as HTMLButtonElement;
+    const swathGroupsCloseBtn = document.getElementById('swathGroupsCloseBtn') as HTMLButtonElement;
     
     if (this.swathGroupsToggleFromTab) {
       this.swathGroupsToggleFromTab.addEventListener('click', () => {
         if (swathGroupsSidebar) {
           swathGroupsSidebar.classList.toggle('collapsed');
+          this.updateSwathGroupsToggleButton();
+        }
+      });
+    }
+    
+    // 헤더 닫기 버튼 이벤트 리스너
+    if (swathGroupsCloseBtn) {
+      swathGroupsCloseBtn.addEventListener('click', () => {
+        if (swathGroupsSidebar) {
+          swathGroupsSidebar.classList.add('collapsed');
           this.updateSwathGroupsToggleButton();
         }
       });
@@ -514,7 +548,7 @@ export class UIManager {
     // 초기 그룹 목록 업데이트
     this.updateSwathGroupsList();
     
-    // 주기적으로 그룹 목록 업데이트
+    // 주기적으로 그룹 목록 업데이트 (선택된 그룹 상태 유지)
     setInterval(() => {
       this.updateSwathGroupsList();
     }, 1000);
@@ -543,6 +577,9 @@ export class UIManager {
     
     // 실시간 추적 그룹의 Swath 동기화
     groupManager.syncSwathsFromManager();
+    
+    // 선택된 그룹이 있으면 해당 그룹의 Swath만 표시, 없으면 모든 Swath 표시
+    this.entityManager.showSwathsByGroupId(this.selectedGroupId);
 
     if (groups.length === 0) {
       swathGroupsList.innerHTML = '<div class="info" style="text-align: center; color: #888; padding: 20px;">생성된 그룹이 없습니다.</div>';
@@ -552,15 +589,20 @@ export class UIManager {
     swathGroupsList.innerHTML = groups.map(group => {
       const createdAt = new Date(group.createdAt).toLocaleString('ko-KR');
       const endedAt = group.endedAt ? new Date(group.endedAt).toLocaleString('ko-KR') : null;
-      const duration = group.endedAt 
-        ? `(${Math.round((group.endedAt - group.createdAt) / 1000)}초)`
-        : '(진행 중)';
+      const isInProgress = !group.endedAt;
+      const duration = isInProgress
+        ? '(진행 중)'
+        : `(${Math.round((group.endedAt! - group.createdAt) / 1000)}초)`;
       
+      const isSelected = this.selectedGroupId === group.id;
       return `
-        <div class="swath-group-item" data-group-id="${group.id}">
+        <div class="swath-group-item ${isInProgress ? 'in-progress' : ''} ${isSelected ? 'selected' : ''}" data-group-id="${group.id}">
           <div class="swath-group-header">
             <div>
-              <div class="swath-group-name">${group.name}</div>
+              <div class="swath-group-name">
+                ${group.name}
+                ${isInProgress ? '<span class="swath-group-badge">진행 중</span>' : ''}
+              </div>
               <div class="swath-group-count">${group.swathIds.length}개 Swath</div>
             </div>
             <button class="swath-group-remove" data-group-id="${group.id}">삭제</button>
@@ -572,13 +614,50 @@ export class UIManager {
       `;
     }).join('');
 
+    // 그룹 아이템 클릭 이벤트 리스너 추가 (선택/해제)
+    swathGroupsList.querySelectorAll('.swath-group-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        // 삭제 버튼 클릭 시에는 선택하지 않음
+        if ((e.target as HTMLElement).classList.contains('swath-group-remove')) {
+          return;
+        }
+        
+        const groupId = (item as HTMLElement).getAttribute('data-group-id');
+        if (groupId) {
+          // 같은 그룹을 클릭하면 선택 해제, 다른 그룹을 클릭하면 선택
+          if (this.selectedGroupId === groupId) {
+            this.selectedGroupId = null;
+          } else {
+            this.selectedGroupId = groupId;
+          }
+          
+          // Swath 표시 업데이트
+          this.entityManager.showSwathsByGroupId(this.selectedGroupId);
+          
+          // 그룹 목록 업데이트 (선택 상태 반영)
+          this.updateSwathGroupsList();
+        }
+      });
+    });
+
     // 삭제 버튼 이벤트 리스너 추가
     swathGroupsList.querySelectorAll('.swath-group-remove').forEach(button => {
       button.addEventListener('click', (e) => {
+        e.stopPropagation(); // 그룹 아이템 클릭 이벤트 전파 방지
+        
         const groupId = (e.target as HTMLElement).getAttribute('data-group-id');
         if (groupId) {
+          // 선택된 그룹이 삭제되면 선택 해제
+          if (this.selectedGroupId === groupId) {
+            this.selectedGroupId = null;
+          }
+          
           const groupManager = this.entityManager.getSwathGroupManager();
           groupManager.removeGroup(groupId);
+          
+          // Swath 표시 업데이트
+          this.entityManager.showSwathsByGroupId(this.selectedGroupId);
+          
           this.updateSwathGroupsList();
         }
       });

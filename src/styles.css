@@ -49,7 +49,7 @@ html, body, #cesiumContainer {
   background: rgba(0, 0, 0, 0.3);
   border-bottom: 1px solid #555;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   transition: all 0.3s ease;
   min-height: 51px;
@@ -61,6 +61,32 @@ html, body, #cesiumContainer {
   font-size: 16px;
   font-weight: bold;
   transition: opacity 0.3s ease;
+  flex: 1;
+  text-align: center;
+}
+
+.swath-groups-close-btn {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.swath-groups-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
 }
 
 #swathGroupsContent {
@@ -77,11 +103,38 @@ html, body, #cesiumContainer {
   padding: 12px;
   margin-bottom: 10px;
   transition: all 0.3s ease;
+  cursor: pointer;
 }
 
 .swath-group-item:hover {
   background: rgba(0, 0, 0, 0.5);
   border-color: #4CAF50;
+}
+
+/* 선택된 그룹 스타일 */
+.swath-group-item.selected {
+  border: 2px solid #2196F3;
+  background: rgba(33, 150, 243, 0.15);
+  box-shadow: 0 0 15px rgba(33, 150, 243, 0.4);
+}
+
+.swath-group-item.selected:hover {
+  background: rgba(33, 150, 243, 0.2);
+  border-color: #1976D2;
+  box-shadow: 0 0 20px rgba(33, 150, 243, 0.6);
+}
+
+/* 진행 중인 그룹 스타일 */
+.swath-group-item.in-progress {
+  border: 2px solid #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+.swath-group-item.in-progress:hover {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: #45a049;
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
 }
 
 .swath-group-header {
@@ -96,6 +149,31 @@ html, body, #cesiumContainer {
   font-weight: bold;
   color: #4CAF50;
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swath-group-badge {
+  display: inline-block;
+  background: #4CAF50;
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .swath-group-count {

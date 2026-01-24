@@ -42,18 +42,19 @@ export class SwathManager {
    */
   addStaticSwath(
     geometry: SARSwathGeometry,
-    options?: Partial<SwathVisualizationOptions>
+    options?: Partial<SwathVisualizationOptions>,
+    groupId?: string  // 그룹 ID (선택적)
   ): string {
     const opts = { ...SwathManager.DEFAULT_OPTIONS, ...options, mode: SwathMode.STATIC };
     const swathId = this.generateSwathId();
 
-    const instance = this.createSwathInstance(swathId, geometry, opts);
+    const instance = this.createSwathInstance(swathId, geometry, opts, groupId);
     this.swaths.set(swathId, instance);
     
     // 최대 개수 제한 체크 (Swath 추가 후 호출)
     this.enforceMaxSwaths(opts.maxSwaths!);
 
-    console.log(`[SwathManager] 정적 Swath 생성: ${swathId}`, geometry);
+    console.log(`[SwathManager] 정적 Swath 생성: ${swathId}${groupId ? ` (그룹: ${groupId})` : ''}`, geometry);
     return swathId;
   }
 
@@ -104,11 +105,7 @@ export class SwathManager {
       satelliteAltitude: initialPosition.altitude,
     };
 
-    const instance = this.createSwathInstance(swathId, initialGeometry, opts);
-    // 그룹 ID 설정
-    if (groupId) {
-      (instance as any).groupId = groupId;
-    }
+    const instance = this.createSwathInstance(swathId, initialGeometry, opts, groupId);
     this.swaths.set(swathId, instance);
     
     // 최대 개수 제한 체크 (초기 Swath 추가 후 호출)
@@ -131,11 +128,7 @@ export class SwathManager {
 
         // 새로운 Swath 생성 (기존 것은 유지, 누적)
         const newSwathId = this.generateSwathId();
-        const newInstance = this.createSwathInstance(newSwathId, updatedGeometry, opts);
-        // 그룹 ID 설정
-        if (groupId) {
-          (newInstance as any).groupId = groupId;
-        }
+        const newInstance = this.createSwathInstance(newSwathId, updatedGeometry, opts, groupId);
         this.swaths.set(newSwathId, newInstance);
         
         // 그룹에 Swath 추가 (콜백을 통해)
@@ -207,7 +200,7 @@ export class SwathManager {
       const alpha = opts.alpha! * (0.3 + 0.7 * (index / predictedPositions.length));
       const customOpts = { ...opts, alpha, labelText: `T+${index * 5}min` };
 
-      const instance = this.createSwathInstance(swathId, geometry, customOpts);
+      const instance = this.createSwathInstance(swathId, geometry, customOpts, undefined);
       this.swaths.set(swathId, instance);
       swathIds.push(swathId);
     });
@@ -250,7 +243,7 @@ export class SwathManager {
           const swathId = this.generateSwathId();
           const customOpts = { ...opts, labelText: `API Swath ${index + 1}` };
           
-          const instance = this.createSwathInstance(swathId, geometry, customOpts);
+          const instance = this.createSwathInstance(swathId, geometry, customOpts, undefined);
           this.swaths.set(swathId, instance);
           swathIds.push(swathId);
         });
@@ -295,6 +288,7 @@ export class SwathManager {
       geometry: this.cornersToGeometry(corners), // 메타데이터용
       createdAt: Date.now(),
       options: opts,
+      groupId: undefined,  // 사용자 정의 기하는 그룹 없음
     };
 
     // 시각화
@@ -320,7 +314,8 @@ export class SwathManager {
   private createSwathInstance(
     swathId: string,
     geometry: SARSwathGeometry,
-    options: SwathVisualizationOptions
+    options: SwathVisualizationOptions,
+    groupId?: string  // 그룹 ID (선택적)
   ): SwathInstance {
     // 코너 계산
     const corners = SARSwathCalculator.calculateSwathCorners(geometry);
@@ -332,6 +327,7 @@ export class SwathManager {
       geometry,
       createdAt: Date.now(),
       options,
+      groupId: groupId,  // 그룹 ID 설정
     };
 
     // Entity 생성
@@ -604,6 +600,55 @@ export class SwathManager {
    * 그룹 ID로 Swath 목록 가져오기
    */
   getSwathsByGroupId(groupId: string): SwathInstance[] {
-    return Array.from(this.swaths.values()).filter(swath => (swath as any).groupId === groupId);
+    return Array.from(this.swaths.values()).filter(swath => swath.groupId === groupId);
+  }
+
+  /**
+   * 특정 그룹의 Swath만 표시하고 나머지는 숨김
+   * @param groupId 선택된 그룹 ID (null이면 모든 Swath 표시)
+   * @param excludeSwathIds 제외할 Swath ID 목록 (미리보기 등)
+   */
+  showSwathsByGroupId(groupId: string | null, excludeSwathIds?: string | string[] | null): void {
+    const allSwaths = Array.from(this.swaths.values());
+    
+    // 제외할 Swath ID 목록을 배열로 변환
+    const excludeIds: string[] = [];
+    if (excludeSwathIds) {
+      if (typeof excludeSwathIds === 'string') {
+        excludeIds.push(excludeSwathIds);
+      } else if (Array.isArray(excludeSwathIds)) {
+        excludeIds.push(...excludeSwathIds);
+      }
+    }
+    
+    allSwaths.forEach(swath => {
+      // 미리보기 Swath는 항상 표시 (제외 목록에 있으면 건너뛰기)
+      if (excludeIds.includes(swath.id)) {
+        return; // 미리보기 Swath는 변경하지 않음
+      }
+      
+      const swathGroupId = swath.groupId;
+      
+      // groupId가 null이면 모든 Swath 표시
+      // groupId가 있으면 해당 그룹의 Swath만 표시
+      const shouldShow = groupId === null 
+        ? true  // 모든 Swath 표시
+        : (swathGroupId === groupId);  // 해당 그룹의 Swath만 표시
+      
+      // Entity 표시/숨김
+      if (swath.entity) {
+        swath.entity.show = shouldShow;
+      }
+      
+      // Primitive 표시/숨김
+      if (swath.primitive) {
+        swath.primitive.show = shouldShow;
+      }
+      
+      // Label 표시/숨김
+      if (swath.label) {
+        swath.label.show = shouldShow;
+      }
+    });
   }
 }

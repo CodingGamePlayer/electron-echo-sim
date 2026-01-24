@@ -59,11 +59,18 @@ export class SwathGroupManager {
     const allSwaths = this.swathManager.getAllSwaths();
     
     allSwaths.forEach(swath => {
-      const groupId = (swath as any).groupId;
+      const groupId = swath.groupId;
       if (groupId) {
         const group = this.groups.get(groupId);
-        if (group && !group.swathIds.includes(swath.id)) {
-          group.swathIds.push(swath.id);
+        if (group) {
+          // 그룹에 Swath ID가 없으면 추가
+          if (!group.swathIds.includes(swath.id)) {
+            group.swathIds.push(swath.id);
+            console.log(`[SwathGroupManager] 그룹 ${groupId}에 Swath ${swath.id} 추가 (동기화)`);
+          }
+        } else {
+          // 그룹이 존재하지 않는데 Swath에 groupId가 있으면 경고
+          console.warn(`[SwathGroupManager] Swath ${swath.id}의 그룹 ${groupId}가 존재하지 않습니다.`);
         }
       }
     });
@@ -94,6 +101,25 @@ export class SwathGroupManager {
       }
       this.currentRealtimeGroupId = null;
     }
+  }
+
+  /**
+   * 특정 그룹 종료 (정적 모드 등에서 사용)
+   */
+  endGroup(groupId: string): boolean {
+    const group = this.groups.get(groupId);
+    if (!group) {
+      console.warn(`[SwathGroupManager] 그룹 ${groupId}를 찾을 수 없습니다.`);
+      return false;
+    }
+
+    // 실시간 추적 그룹이면 현재 그룹 ID 초기화
+    if (this.currentRealtimeGroupId === groupId) {
+      this.currentRealtimeGroupId = null;
+    }
+
+    group.endedAt = Date.now();
+    return true;
   }
 
   /**
@@ -129,10 +155,20 @@ export class SwathGroupManager {
   }
 
   /**
-   * 모든 그룹 반환
+   * 모든 그룹 반환 (진행 중인 그룹을 먼저, 그 다음 생성 시간 역순)
    */
   getAllGroups(): SwathGroup[] {
-    return Array.from(this.groups.values()).sort((a, b) => b.createdAt - a.createdAt);
+    return Array.from(this.groups.values()).sort((a, b) => {
+      // 진행 중인 그룹(endedAt이 없는 그룹)을 먼저 표시
+      const aInProgress = !a.endedAt;
+      const bInProgress = !b.endedAt;
+      
+      if (aInProgress && !bInProgress) return -1;
+      if (!aInProgress && bInProgress) return 1;
+      
+      // 둘 다 진행 중이거나 둘 다 완료된 경우, 생성 시간 역순으로 정렬
+      return b.createdAt - a.createdAt;
+    });
   }
 
   /**

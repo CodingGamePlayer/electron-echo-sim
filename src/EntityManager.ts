@@ -376,8 +376,10 @@ export class EntityManager {
   addStaticSwath(geometry: SARSwathGeometry, options?: any): string {
     // 정적 모드에서는 매번 새 그룹 생성
     const groupId = this.swathGroupManager.createGroup(SwathMode.STATIC);
-    const swathId = this.swathManager.addStaticSwath(geometry, options);
+    const swathId = this.swathManager.addStaticSwath(geometry, options, groupId);
     this.swathGroupManager.addSwathToGroup(groupId, swathId);
+    // 정적 모드는 즉시 완료되므로 endedAt 설정
+    this.swathGroupManager.endGroup(groupId);
     return swathId;
   }
 
@@ -471,6 +473,14 @@ export class EntityManager {
    */
   getSwathGroupManager(): SwathGroupManager {
     return this.swathGroupManager;
+  }
+
+  /**
+   * 특정 그룹의 Swath만 표시 (미리보기 Swath 제외)
+   */
+  showSwathsByGroupId(groupId: string | null): void {
+    // 미리보기 Swath ID를 제외하고 표시/숨김 처리
+    this.swathManager.showSwathsByGroupId(groupId, this.previewSwathId);
   }
 
 
