@@ -4,10 +4,12 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.preload.json",
-    "build:watch": "concurrently \"tsc --watch\" \"tsc -p tsconfig.preload.json --watch\"",
+    "build": "tsc && tsc -p tsconfig.preload.json && npm run copy:css",
+    "build:watch": "concurrently \"tsc --watch\" \"tsc -p tsconfig.preload.json --watch\" \"npm run copy:css:watch\"",
+    "copy:css": "node scripts/copy-css.js",
+    "copy:css:watch": "node scripts/copy-css-watch.js",
     "start": "npm run build && electron .",
-    "dev": "concurrently \"npm run build:watch\" \"wait-on dist/main.js dist/preload.js && electron .\"",
+    "dev": "npm run copy:css && concurrently \"npm run build:watch\" \"wait-on dist/main.js dist/preload.js dist/index.html dist/styles.css && electron .\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

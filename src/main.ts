@@ -26,7 +26,12 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../index.html'));
+  // index.html과 styles.css가 같은 dist 폴더에 있으므로 상대 경로 사용
+  // loadFile은 HTML 파일의 디렉토리를 기준으로 상대 경로를 해석함
+  const htmlPath = path.join(__dirname, 'index.html');
+  console.log('[Main] Loading HTML from:', htmlPath);
+  console.log('[Main] CSS should be at:', path.join(__dirname, 'styles.css'));
+  mainWindow.loadFile(htmlPath);
 
   mainWindow.on('closed', () => {
     mainWindow = null;

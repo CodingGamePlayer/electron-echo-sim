@@ -6,300 +6,8 @@
   <title>Cesium Electron App</title>
   <!-- CesiumJS CSS -->
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-  <style>
-    html, body, #cesiumContainer {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-
-    /* 사이드바 스타일 */
-    #sidebar {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 380px;
-      height: 100vh;
-      background: rgba(42, 42, 42, 0.95);
-      color: white;
-      font-family: sans-serif;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
-      transition: all 0.3s ease;
-    }
-
-    /* 접은 상태: 좁은 바 형태로 변경 */
-    #sidebar.collapsed {
-      width: 50px;
-      transform: translateX(0);
-    }
-
-    #sidebar.collapsed #sidebarHeader {
-      padding: 10px 5px;
-      flex-direction: column;
-      justify-content: flex-start;
-      align-items: center;
-      height: 100%;
-      border-bottom: none;
-      border-right: 1px solid #555;
-    }
-
-    #sidebar.collapsed #sidebarHeader h2 {
-      display: none;
-    }
-
-    #sidebar.collapsed #sidebarContent {
-      display: none;
-    }
-
-    #sidebarHeader {
-      padding: 15px;
-      background: rgba(0, 0, 0, 0.3);
-      border-bottom: 1px solid #555;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      transition: all 0.3s ease;
-    }
-
-    #sidebarHeader h2 {
-      margin: 0;
-      font-size: 16px;
-      font-weight: bold;
-      transition: opacity 0.3s ease;
-    }
-
-    #sidebarToggle {
-      background: rgba(76, 175, 80, 0.8);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      color: white;
-      padding: 8px 12px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 16px;
-      font-weight: bold;
-      white-space: nowrap;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 40px;
-      min-height: 40px;
-    }
-
-    #sidebarToggle:hover {
-      background: rgba(76, 175, 80, 1);
-      border-color: rgba(255, 255, 255, 0.5);
-      transform: scale(1.05);
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
-    }
-
-    /* 접은 상태에서 펼치기 버튼 스타일 */
-    #sidebar.collapsed #sidebarToggle {
-      width: 40px;
-      height: 40px;
-      padding: 0;
-      writing-mode: horizontal-tb;
-      text-orientation: mixed;
-      font-size: 16px;
-      letter-spacing: 0;
-      background: rgba(76, 175, 80, 0.9);
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-radius: 5px;
-    }
-
-    #sidebar.collapsed #sidebarToggle:hover {
-      background: rgba(76, 175, 80, 1);
-      border-color: rgba(255, 255, 255, 0.6);
-      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
-    }
-
-    #sidebarContent {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0;
-      transition: opacity 0.3s ease;
-    }
-
-    #sidebarContent::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    #sidebarContent::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    #sidebarContent::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
-    }
-
-    #sidebarContent::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.3);
-    }
-
-    .sidebar-section {
-      margin-bottom: 20px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #555;
-    }
-
-    .sidebar-section:last-child {
-      border-bottom: none;
-    }
-
-    .sidebar-section h3 {
-      margin: 0 0 12px 0;
-      font-size: 14px;
-      font-weight: bold;
-      color: #4CAF50;
-    }
-
-    .sidebar-section label {
-      display: block;
-      margin-top: 10px;
-      font-size: 12px;
-    }
-
-    .sidebar-section label:first-child {
-      margin-top: 0;
-    }
-
-    .sidebar-section input[type="text"],
-    .sidebar-section input[type="number"],
-    .sidebar-section select,
-    .sidebar-section textarea {
-      width: 100%;
-      padding: 6px;
-      background: rgba(0, 0, 0, 0.5);
-      color: white;
-      border: 1px solid #555;
-      border-radius: 3px;
-      box-sizing: border-box;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
-    .sidebar-section textarea {
-      resize: vertical;
-      font-family: monospace;
-      font-size: 11px;
-      min-height: 100px;
-    }
-
-    .sidebar-section input[type="range"] {
-      width: 100%;
-      margin-top: 4px;
-    }
-
-    .sidebar-section input[type="checkbox"] {
-      margin-right: 6px;
-    }
-
-    .sidebar-section button {
-      margin-top: 8px;
-      padding: 8px 12px;
-      background: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 3px;
-      cursor: pointer;
-      font-size: 12px;
-      width: 100%;
-    }
-
-    .sidebar-section button:hover {
-      background: #45a049;
-    }
-
-    .sidebar-section button.danger {
-      background: #f44336;
-    }
-
-    .sidebar-section button.danger:hover {
-      background: #da190b;
-    }
-
-    .sidebar-section .info {
-      font-size: 11px;
-      color: #aaa;
-      margin-top: 5px;
-      line-height: 1.4;
-    }
-
-    .sidebar-section .row {
-      display: flex;
-      gap: 10px;
-    }
-
-    .sidebar-section .row > * {
-      flex: 1;
-    }
-
-    .sidebar-section h4 {
-      margin: 0 0 8px 0;
-      font-size: 12px;
-      font-weight: bold;
-      color: #ccc;
-    }
-
-    /* 탭 스타일 */
-    .tab-container {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      min-height: 0;
-    }
-
-    .tab-buttons {
-      display: flex;
-      border-bottom: 1px solid #555;
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .tab-button {
-      flex: 1;
-      padding: 10px 15px;
-      background: transparent;
-      border: none;
-      color: #aaa;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: bold;
-      transition: all 0.3s ease;
-      border-bottom: 2px solid transparent;
-    }
-
-    .tab-button:hover {
-      background: rgba(255, 255, 255, 0.05);
-      color: #fff;
-    }
-
-    .tab-button.active {
-      color: #4CAF50;
-      border-bottom-color: #4CAF50;
-      background: rgba(76, 175, 80, 0.1);
-    }
-
-    .tab-content {
-      display: none;
-      flex: 1;
-      overflow-y: auto;
-      padding: 15px;
-      min-height: 0;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-  </style>
+  <!-- 애플리케이션 CSS -->
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
   <div id="cesiumContainer"></div>
@@ -358,6 +66,10 @@
             <div id="realtimeTrackingControls" style="display: none; margin-top: 10px;">
               <button id="realtimeTrackingToggle" class="sidebar-section button" style="width: 100%; margin-top: 8px;">시작</button>
             </div>
+            <!-- 정적 모드용 Swath 추가 버튼 -->
+            <div id="staticModeControls" style="display: none; margin-top: 10px;">
+              <button id="staticAddSwathBtn" class="sidebar-section button" style="width: 100%; margin-top: 8px;">Swath 추가</button>
+            </div>
           </div>
 
           <div class="sidebar-section">
@@ -411,20 +123,20 @@
               <div class="info">Swath 방향을 조정합니다. 양수는 시계 방향, 음수는 반시계 방향입니다.</div>
             </label>
           </div>
-          
-          <div class="sidebar-section">
-            <h4>모드별 옵션</h4>
-            <div id="modeSpecificOptions">
-              <!-- 모드별 옵션이 동적으로 표시됨 -->
-            </div>
-          </div>
-          
-          <div class="sidebar-section">
-            <button id="addSwathBtn">Swath 추가</button>
-            <button id="clearAllSwathsBtn" class="danger" style="margin-top: 8px;">지금까지 쌓은 Swath 초기화</button>
-            <div class="info" id="swathInfo" style="margin-top: 10px;">Swath 개수: 0</div>
-          </div>
         </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 두 번째 사이드바: Swath 그룹 관리 -->
+  <div id="swathGroupsSidebar">
+    <div id="swathGroupsHeader">
+      <h2>Swath 그룹</h2>
+      <button id="swathGroupsToggle">◀</button>
+    </div>
+    <div id="swathGroupsContent">
+      <div id="swathGroupsList">
+        <!-- 그룹 목록이 동적으로 표시됨 -->
       </div>
     </div>
   </div>
@@ -439,7 +151,7 @@
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZjEzNDA2OC05MTE2LTQ2ODgtOGJiYi05MDFjNzc2ZDg0NDIiLCJpZCI6MjE1NTM4LCJpYXQiOjE3NjkxNjM4MjB9.-JMo-431f4Bkr6NdfcU8y7WFo0ZTi1BxDInRWHWJhtE';
 
     // 클래스 모듈 import
-    import { App } from './dist/App.js';
+    import { App } from './App.js';
     
     // 모듈 로딩 오류 처리
     window.addEventListener('error', (e) => {

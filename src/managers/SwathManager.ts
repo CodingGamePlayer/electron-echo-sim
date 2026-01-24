@@ -16,6 +16,7 @@ export class SwathManager {
   private swaths: Map<string, SwathInstance>;
   private nextSwathId: number;
   private updateHandlers: Map<string, (() => void)>;
+  public onSwathAdded?: (groupId: string, swathId: string) => void;  // 그룹 추가 콜백
 
   private static readonly DEFAULT_OPTIONS: SwathVisualizationOptions = {
     mode: SwathMode.STATIC,
@@ -68,7 +69,8 @@ export class SwathManager {
       swathWidth?: number;
       azimuthLength?: number;
     } = {},
-    options?: Partial<SwathVisualizationOptions>
+    options?: Partial<SwathVisualizationOptions>,
+    groupId?: string  // 그룹 ID (선택적)
   ): string {
     const opts = { 
       ...SwathManager.DEFAULT_OPTIONS, 
@@ -104,6 +106,10 @@ export class SwathManager {
     };
 
     const instance = this.createSwathInstance(swathId, initialGeometry, opts);
+    // 그룹 ID 설정
+    if (groupId) {
+      (instance as any).groupId = groupId;
+    }
     this.swaths.set(swathId, instance);
     
     // 최대 개수 제한 체크 (초기 Swath 추가 후 호출)
@@ -127,7 +133,16 @@ export class SwathManager {
         // 새로운 Swath 생성 (기존 것은 유지, 누적)
         const newSwathId = this.generateSwathId();
         const newInstance = this.createSwathInstance(newSwathId, updatedGeometry, opts);
+        // 그룹 ID 설정
+        if (groupId) {
+          (newInstance as any).groupId = groupId;
+        }
         this.swaths.set(newSwathId, newInstance);
+        
+        // 그룹에 Swath 추가 (콜백을 통해)
+        if (groupId && (this as any).onSwathAdded) {
+          (this as any).onSwathAdded(groupId, newSwathId);
+        }
         
         // 최대 개수 제한 체크 (새 Swath 추가 후 호출)
         this.enforceMaxSwaths(opts.maxSwaths!);
@@ -137,7 +152,7 @@ export class SwathManager {
     const intervalId = setInterval(updateHandler, opts.updateInterval);
     this.updateHandlers.set(swathId, () => clearInterval(intervalId));
 
-    console.log(`[SwathManager] 실시간 추적 Swath 시작: ${swathId}`);
+    console.log(`[SwathManager] 실시간 추적 Swath 시작: ${swathId}${groupId ? ` (그룹: ${groupId})` : ''}`);
     return swathId;
   }
 
@@ -614,5 +629,12 @@ export class SwathManager {
    */
   getAllSwaths(): SwathInstance[] {
     return Array.from(this.swaths.values());
+  }
+
+  /**
+   * 그룹 ID로 Swath 목록 가져오기
+   */
+  getSwathsByGroupId(groupId: string): SwathInstance[] {
+    return Array.from(this.swaths.values()).filter(swath => (swath as any).groupId === groupId);
   }
 }

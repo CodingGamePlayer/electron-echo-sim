@@ -76,4 +76,15 @@ export interface SwathInstance {
   createdAt: number;                 // Unix timestamp
   label?: any;                       // Cesium Label Entity
   options: SwathVisualizationOptions;
+  groupId?: string;                  // 그룹 ID (선택적)
+}
+
+// ✅ Swath 그룹 인터페이스
+export interface SwathGroup {
+  id: string;
+  name: string;
+  mode: SwathMode;
+  swathIds: string[];                // 그룹에 속한 Swath ID 목록
+  createdAt: number;                 // 그룹 생성 시간
+  endedAt?: number;                   // 그룹 종료 시간 (실시간 추적의 경우)
 }

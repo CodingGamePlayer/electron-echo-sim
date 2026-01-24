@@ -2,6 +2,7 @@ import { SatelliteManager } from './SatelliteManager.js';
 import { SARSwathCalculator } from './utils/sar-swath-calculator.js';
 import { SARSwathGeometry, SwathMode } from './types/sar-swath.types.js';
 import { SwathManager } from './managers/SwathManager.js';
+import { SwathGroupManager } from './managers/SwathGroupManager.js';
 
 /**
  * EntityManager - 엔티티 생성 및 관리
@@ -10,6 +11,7 @@ export class EntityManager {
   private viewer: any;
   private satelliteManager: SatelliteManager;
   private swathManager: SwathManager;
+  private swathGroupManager: SwathGroupManager;
   private entity: any;
   private position: any;
   private currentCartesian: any;
@@ -37,6 +39,7 @@ export class EntityManager {
     this.viewer = viewer;
     this.satelliteManager = satelliteManager;
     this.swathManager = new SwathManager(viewer);
+    this.swathGroupManager = new SwathGroupManager(this.swathManager);
     this.entity = null;
     this.position = null;
     this.currentCartesian = null;
@@ -483,14 +486,28 @@ export class EntityManager {
       return { latitude, longitude, altitude, heading };
     };
 
+    // 실시간 추적 그룹 시작
+    const groupId = this.swathGroupManager.startRealtimeGroup();
+    
+    // SwathManager에 그룹 추가 콜백 설정
+    (this.swathManager as any).onSwathAdded = (groupId: string, swathId: string) => {
+      this.swathGroupManager.addSwathToGroup(groupId, swathId);
+    };
+    
     // 실시간 추적 시작
     this.realtimeSwathId = this.swathManager.addRealtimeTrackingSwath(
       getSatellitePosition,
       swathParams,
-      options
+      options,
+      groupId  // 그룹 ID 전달
     );
+    
+    // 초기 Swath를 그룹에 추가
+    if (this.realtimeSwathId) {
+      this.swathGroupManager.addSwathToGroup(groupId, this.realtimeSwathId);
+    }
 
-    console.log('[EntityManager] 실시간 Swath 추적 시작:', this.realtimeSwathId);
+    console.log('[EntityManager] 실시간 Swath 추적 시작:', this.realtimeSwathId, '그룹:', groupId);
   }
 
   /**
@@ -498,6 +515,9 @@ export class EntityManager {
    */
   stopRealtimeSwathTracking(): void {
     if (this.realtimeSwathId) {
+      // 실시간 추적 그룹 종료
+      this.swathGroupManager.endRealtimeGroup();
+      
       this.swathManager.removeSwath(this.realtimeSwathId);
       this.realtimeSwathId = null;
       console.log('[EntityManager] 실시간 Swath 추적 중지');
@@ -505,10 +525,14 @@ export class EntityManager {
   }
 
   /**
-   * ✅ 정적 Swath 추가
+   * ✅ 정적 Swath 추가 (그룹 생성)
    */
   addStaticSwath(geometry: SARSwathGeometry, options?: any): string {
-    return this.swathManager.addStaticSwath(geometry, options);
+    // 정적 모드에서는 매번 새 그룹 생성
+    const groupId = this.swathGroupManager.createGroup(SwathMode.STATIC);
+    const swathId = this.swathManager.addStaticSwath(geometry, options);
+    this.swathGroupManager.addSwathToGroup(groupId, swathId);
+    return swathId;
   }
 
   /**
@@ -594,6 +618,13 @@ export class EntityManager {
    */
   getSwathManager(): SwathManager {
     return this.swathManager;
+  }
+
+  /**
+   * SwathGroupManager 접근
+   */
+  getSwathGroupManager(): SwathGroupManager {
+    return this.swathGroupManager;
   }
 
   /**
