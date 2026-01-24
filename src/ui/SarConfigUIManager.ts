@@ -56,6 +56,14 @@ const API_BASE_URL = 'http://localhost:8000/api';
  */
 export class SarConfigUIManager {
   private onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void;
+  private currentSarConfig: SarConfigDetail | null = null;
+
+  /**
+   * 현재 선택된 SAR 설정 가져오기
+   */
+  getCurrentSarConfig(): SarConfigDetail | null {
+    return this.currentSarConfig;
+  }
 
   /**
    * SAR 설정 UI 초기화
@@ -157,6 +165,21 @@ export class SarConfigUIManager {
         const nameInput = document.getElementById('sarConfigName') as HTMLInputElement;
         if (nameInput) {
           nameInput.value = record.name;
+        }
+
+        // 현재 설정 저장
+        this.currentSarConfig = record;
+
+        // SAR 설정 검증 (경고만 표시)
+        const minFs = 2 * record.bw;
+        if (record.fs < minFs) {
+          const warningMsg = 
+            `경고: 샘플링 주파수(fs=${(record.fs / 1e6).toFixed(1)} MHz)가 ` +
+            `나이키스트율(${(minFs / 1e6).toFixed(1)} MHz)보다 작습니다. ` +
+            `Signal 생성 시 오류가 발생할 수 있습니다. ` +
+            `fs를 최소 ${(minFs / 1e6).toFixed(1)} MHz 이상으로 설정하는 것을 권장합니다.`;
+          console.warn(warningMsg);
+          // 경고는 콘솔에만 표시하고 사용자에게는 알리지 않음 (설정 불러오기는 성공)
         }
 
         // SAR 설정을 Swath 제어 탭에 적용

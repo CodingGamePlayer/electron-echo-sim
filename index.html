@@ -128,6 +128,27 @@
               <div class="info">Swath 방향을 조정합니다. 양수는 시계 방향, 음수는 반시계 방향입니다.</div>
             </label>
           </div>
+
+          <!-- Signal 시각화 패널 (Swath 추가 후 표시) -->
+          <div id="signalResultsPanel" style="display: none; margin-top: 20px;">
+            <div class="sidebar-section">
+              <h4>Signal 시뮬레이션 결과</h4>
+              
+              <!-- SAR Signal (Chirp) -->
+              <div class="signal-section" style="margin-bottom: 20px;">
+                <h5 style="color: #fff; font-size: 13px; margin-bottom: 10px;">SAR Signal (Chirp)</h5>
+                <canvas id="chirpSignalCanvas" width="800" height="400" style="max-width: 100%; height: auto; background: #1e1e1e; border: 1px solid #444;"></canvas>
+                <div id="chirpStatistics" style="margin-top: 10px;"></div>
+              </div>
+              
+              <!-- Echo Signal -->
+              <div class="signal-section" style="margin-top: 20px;">
+                <h5 style="color: #fff; font-size: 13px; margin-bottom: 10px;">Echo Signal</h5>
+                <canvas id="echoSignalCanvas" width="800" height="300" style="max-width: 100%; height: auto; background: #1e1e1e; border: 1px solid #444;"></canvas>
+                <div id="echoStatistics" style="margin-top: 10px;"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- SAR 시스템 설정 탭 -->

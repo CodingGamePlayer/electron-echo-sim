@@ -1,12 +1,25 @@
 import { EntityManager } from '../entity/EntityManager.js';
 import { SARSwathGeometry } from '../types/sar-swath.types.js';
 import { calculateSwathParamsFromSarConfig, validateSarConfig, SarSystemConfig, SwathParams } from '../utils/swath-param-calculator.js';
+import { SarConfigUIManager } from './SarConfigUIManager.js';
+import { SignalVisualizationPanel } from './SignalVisualizationPanel.js';
+import { convertSwathToTargets } from '../utils/swath-to-target-converter.js';
+import { getCurrentSatelliteStateForEcho } from '../utils/satellite-state-helper.js';
+import { generateChirpSignal, convertSarConfigToRequest, SarSystemConfigRequest } from '../utils/chirp-api-client.js';
+import { simulateEcho } from '../utils/echo-api-client.js';
+import { SignalDataProcessor } from '../utils/signal-data-processor.js';
+import { ChirpSimulationResponse, EchoSimulationResponse } from '../types/signal.types.js';
+import { SatelliteManager } from '../satellite/SatelliteManager.js';
 
 /**
  * Swath 제어 UI 관리
  */
 export class SwathControlUIManager {
   private entityManager: EntityManager;
+  private satelliteManager?: SatelliteManager;
+  private sarConfigUIManager?: SarConfigUIManager;
+  private signalVisualizationPanel?: SignalVisualizationPanel;
+  private viewer?: any;
   private realtimeTrackingToggle: HTMLButtonElement | null;
   private realtimeTrackingControls: HTMLDivElement | null;
   private staticModeControls: HTMLDivElement | null;
@@ -14,13 +27,28 @@ export class SwathControlUIManager {
   private isRealtimeTrackingActive: boolean;
   private onGroupListUpdate?: () => void;
 
-  constructor(entityManager: EntityManager) {
+  constructor(
+    entityManager: EntityManager,
+    sarConfigUIManager?: SarConfigUIManager,
+    satelliteManager?: SatelliteManager,
+    viewer?: any
+  ) {
     this.entityManager = entityManager;
+    this.sarConfigUIManager = sarConfigUIManager;
+    this.satelliteManager = satelliteManager;
+    this.viewer = viewer;
     this.realtimeTrackingToggle = null;
     this.realtimeTrackingControls = null;
     this.staticModeControls = null;
     this.staticAddSwathBtn = null;
     this.isRealtimeTrackingActive = false;
+  }
+
+  /**
+   * Signal 시각화 패널 설정
+   */
+  setSignalVisualizationPanel(panel: SignalVisualizationPanel): void {
+    this.signalVisualizationPanel = panel;
   }
 
   /**
@@ -178,16 +206,25 @@ export class SwathControlUIManager {
   }
 
   /**
-   * 정적 Swath 추가
+   * 정적 Swath 추가 (Signal 생성 포함)
    */
-  private addStaticSwath(options: any, swathParams: any): void {
+  private async addStaticSwath(options: any, swathParams: any): Promise<void> {
     try {
+      // 1. 현재 SAR 설정 확인
+      const sarConfig = this.sarConfigUIManager?.getCurrentSarConfig();
+      if (!sarConfig) {
+        alert('먼저 SAR 설정을 불러오세요.');
+        return;
+      }
+
+      // 2. 현재 위성 위치 확인
       const currentPosition = this.entityManager.getCurrentSatellitePosition();
       if (!currentPosition) {
         alert('위성 위치를 가져올 수 없습니다. TLE가 활성화되어 있는지 확인하세요.');
         return;
       }
 
+      // 3. Swath 기하 정보 생성
       const geometry: SARSwathGeometry = {
         centerLat: currentPosition.latitude,
         centerLon: currentPosition.longitude,
@@ -198,14 +235,153 @@ export class SwathControlUIManager {
         azimuthLength: swathParams.azimuthLength,
         satelliteAltitude: currentPosition.altitude,
       };
-      this.entityManager.addStaticSwath(geometry, options);
+
+      // 4. Swath 추가 (기존 로직)
+      const swathId = this.entityManager.addStaticSwath(geometry, options);
       
       if (this.onGroupListUpdate) {
         this.onGroupListUpdate();
       }
+
+      // 5. Signal 생성 및 시각화
+      try {
+        await this.generateAndDisplaySignals(geometry, sarConfig);
+      } catch (signalError: any) {
+        console.error('Signal 생성 실패:', signalError);
+        // Signal 생성 실패해도 Swath는 추가됨
+        const errorMessage = signalError.message || '알 수 없는 오류가 발생했습니다.';
+        alert(`Signal 생성 실패\n\n${errorMessage}\n\nSwath는 추가되었지만 Signal 결과를 표시할 수 없습니다.`);
+      }
     } catch (error: any) {
       console.error('Swath 추가 실패:', error);
       alert('Swath 추가 실패: ' + error.message);
+    }
+  }
+
+  /**
+   * SAR 설정 검증
+   */
+  private validateSarConfig(sarConfig: any): void {
+    // 나이키스트 샘플링 조건 검증: fs >= 2 * bw
+    if (sarConfig.fs < 2 * sarConfig.bw) {
+      throw new Error(
+        `샘플링 주파수(fs=${sarConfig.fs.toExponential(2)} Hz)는 ` +
+        `나이키스트율(2*bw=${(2 * sarConfig.bw).toExponential(2)} Hz) 이상이어야 합니다. ` +
+        `현재 설정: fs=${(sarConfig.fs / 1e6).toFixed(1)} MHz, bw=${(sarConfig.bw / 1e6).toFixed(1)} MHz. ` +
+        `fs를 최소 ${((2 * sarConfig.bw) / 1e6).toFixed(1)} MHz 이상으로 설정하세요.`
+      );
+    }
+
+    // 기본 검증
+    if (sarConfig.fs <= 0 || sarConfig.bw <= 0) {
+      throw new Error('샘플링 주파수(fs)와 대역폭(bw)은 0보다 커야 합니다.');
+    }
+
+    if (sarConfig.fs <= sarConfig.bw) {
+      throw new Error('샘플링 주파수(fs)는 대역폭(bw)보다 커야 합니다.');
+    }
+  }
+
+  /**
+   * Signal 생성 및 표시
+   */
+  private async generateAndDisplaySignals(
+    geometry: SARSwathGeometry,
+    sarConfig: any
+  ): Promise<void> {
+    if (!this.satelliteManager || !this.viewer) {
+      throw new Error('SatelliteManager 또는 Viewer가 설정되지 않았습니다.');
+    }
+
+    // SAR 설정 검증
+    try {
+      this.validateSarConfig(sarConfig);
+    } catch (validationError: any) {
+      throw new Error(`SAR 설정 검증 실패: ${validationError.message}`);
+    }
+
+    // SAR 설정을 API 요청 형식으로 변환
+    const configRequest = convertSarConfigToRequest(sarConfig);
+
+    // 1. SAR Signal (Chirp) 생성
+    let chirpResult: ChirpSimulationResponse;
+    try {
+      chirpResult = await generateChirpSignal(configRequest);
+    } catch (error: any) {
+      throw new Error(`Chirp 신호 생성 실패: ${error.message}`);
+    }
+
+    // 2. Swath → 타겟 변환
+    const targets = convertSwathToTargets(geometry, {
+      rangeResolution: 1000,    // 1km 해상도
+      azimuthResolution: 1000,
+      defaultReflectivity: 1.0
+    });
+
+    if (targets.length === 0) {
+      throw new Error('타겟이 생성되지 않았습니다.');
+    }
+
+    // 3. 위성 상태 가져오기
+    const satelliteState = getCurrentSatelliteStateForEcho(
+      this.entityManager,
+      this.satelliteManager,
+      this.viewer
+    );
+    if (!satelliteState) {
+      throw new Error('위성 위치를 가져올 수 없습니다.');
+    }
+
+    // 4. Echo Signal 생성
+    let echoResult: EchoSimulationResponse;
+    try {
+      echoResult = await simulateEcho(configRequest, targets, satelliteState);
+    } catch (error: any) {
+      throw new Error(`Echo 신호 생성 실패: ${error.message}`);
+    }
+
+    // 5. 결과 시각화
+    this.displaySignalResults(chirpResult, echoResult, sarConfig);
+  }
+
+  /**
+   * Signal 결과 표시
+   */
+  private displaySignalResults(
+    chirpResult: ChirpSimulationResponse,
+    echoResult: EchoSimulationResponse,
+    config: any
+  ): void {
+    if (!this.signalVisualizationPanel) {
+      console.warn('Signal 시각화 패널이 설정되지 않았습니다.');
+      return;
+    }
+
+    try {
+      // 데이터 디코딩
+      const chirpData = SignalDataProcessor.decodeBase64ComplexData(
+        chirpResult.data,
+        chirpResult.shape
+      );
+      const echoData = SignalDataProcessor.decodeBase64ComplexData(
+        echoResult.data,
+        echoResult.shape
+      );
+
+      // 통계 계산
+      const chirpStats = SignalDataProcessor.computeStatistics(chirpData);
+      const echoStats = SignalDataProcessor.computeStatistics(echoData);
+
+      // 시각화
+      this.signalVisualizationPanel.displayChirpSignal(chirpData, config);
+      this.signalVisualizationPanel.displayEchoSignal(echoData, config);
+      this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
+
+      // 패널 표시
+      this.signalVisualizationPanel.show();
+    } catch (error: any) {
+      console.error('Signal 시각화 실패:', error);
+      throw new Error(`Signal 시각화 실패: ${error.message}`);
     }
   }
 
@@ -323,7 +499,7 @@ export class SwathControlUIManager {
       return;
     }
 
-    this.staticAddSwathBtn.addEventListener('click', () => {
+    this.staticAddSwathBtn.addEventListener('click', async () => {
       this.entityManager.clearSwathPreview();
       
       const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
@@ -332,21 +508,37 @@ export class SwathControlUIManager {
       const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
       const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
 
-      this.addStaticSwath(
-        {
-          color: swathColor?.value || 'PURPLE',
-          alpha: parseFloat(swathAlpha?.value || '0.001'),
-          maxSwaths: 1000,
-        },
-        {
-          nearRange: parseFloat(swathNearRange?.value || '200000'),
-          farRange: this.calculateFarRange(),
-          swathWidth: parseFloat(swathWidth?.value || '400000'),
-          azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
-        }
-      );
+      // 로딩 표시
+      if (!this.staticAddSwathBtn) {
+        return;
+      }
       
-      this.updateSwathPreview();
+      const originalText = this.staticAddSwathBtn.textContent;
+      this.staticAddSwathBtn.textContent = '처리 중...';
+      this.staticAddSwathBtn.disabled = true;
+
+      try {
+        await this.addStaticSwath(
+          {
+            color: swathColor?.value || 'PURPLE',
+            alpha: parseFloat(swathAlpha?.value || '0.001'),
+            maxSwaths: 1000,
+          },
+          {
+            nearRange: parseFloat(swathNearRange?.value || '200000'),
+            farRange: this.calculateFarRange(),
+            swathWidth: parseFloat(swathWidth?.value || '400000'),
+            azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+          }
+        );
+      } finally {
+        // 버튼 복원
+        if (this.staticAddSwathBtn) {
+          this.staticAddSwathBtn.textContent = originalText;
+          this.staticAddSwathBtn.disabled = false;
+        }
+        this.updateSwathPreview();
+      }
     });
   }
 
