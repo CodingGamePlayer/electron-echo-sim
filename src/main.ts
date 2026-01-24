@@ -1,7 +1,9 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { DatabaseManager } from './database/DatabaseManager.js';
+import { SarConfigService } from './database/SarConfigService.js';
+import { SaveSarSystemConfigRequest } from './types/sar-config.types.js';
 
 // ES 모듈에서 __dirname 대체
 const __filename = fileURLToPath(import.meta.url);
@@ -9,6 +11,7 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow: BrowserWindow | null = null;
 let databaseManager: DatabaseManager | null = null;
+let sarConfigService: SarConfigService | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -45,10 +48,14 @@ app.whenReady().then(() => {
   try {
     databaseManager = new DatabaseManager();
     databaseManager.initialize();
+    sarConfigService = new SarConfigService(databaseManager);
     console.log('[Main] 데이터베이스 초기화 완료');
   } catch (error) {
     console.error('[Main] 데이터베이스 초기화 실패:', error);
   }
+
+  // IPC 핸들러 설정
+  setupIpcHandlers();
 
   createWindow();
 
@@ -77,4 +84,86 @@ app.on('before-quit', () => {
     databaseManager.close();
     databaseManager = null;
   }
+  sarConfigService = null;
 });
+
+/**
+ * IPC 핸들러 설정
+ */
+function setupIpcHandlers() {
+  // SAR 시스템 설정 저장
+  ipcMain.handle('sar-config:save', async (_event, request: SaveSarSystemConfigRequest) => {
+    try {
+      if (!sarConfigService) {
+        throw new Error('SAR 설정 서비스가 초기화되지 않았습니다.');
+      }
+      const result = sarConfigService.saveConfig(request);
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('[Main] SAR 설정 저장 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // SAR 시스템 설정 업데이트
+  ipcMain.handle('sar-config:update', async (_event, id: string, request: SaveSarSystemConfigRequest) => {
+    try {
+      if (!sarConfigService) {
+        throw new Error('SAR 설정 서비스가 초기화되지 않았습니다.');
+      }
+      const result = sarConfigService.updateConfig(id, request);
+      if (!result) {
+        return { success: false, error: '설정을 찾을 수 없습니다.' };
+      }
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('[Main] SAR 설정 업데이트 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // SAR 시스템 설정 목록 조회
+  ipcMain.handle('sar-config:getAll', async () => {
+    try {
+      if (!sarConfigService) {
+        throw new Error('SAR 설정 서비스가 초기화되지 않았습니다.');
+      }
+      const result = sarConfigService.getAllConfigs();
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('[Main] SAR 설정 목록 조회 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // SAR 시스템 설정 조회 (ID)
+  ipcMain.handle('sar-config:getById', async (_event, id: string) => {
+    try {
+      if (!sarConfigService) {
+        throw new Error('SAR 설정 서비스가 초기화되지 않았습니다.');
+      }
+      const result = sarConfigService.getConfigById(id);
+      if (!result) {
+        return { success: false, error: '설정을 찾을 수 없습니다.' };
+      }
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('[Main] SAR 설정 조회 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // SAR 시스템 설정 삭제
+  ipcMain.handle('sar-config:delete', async (_event, id: string) => {
+    try {
+      if (!sarConfigService) {
+        throw new Error('SAR 설정 서비스가 초기화되지 않았습니다.');
+      }
+      const result = sarConfigService.deleteConfig(id);
+      return { success: result };
+    } catch (error: any) {
+      console.error('[Main] SAR 설정 삭제 실패:', error);
+      return { success: false, error: error.message };
+    }
+  });
+}

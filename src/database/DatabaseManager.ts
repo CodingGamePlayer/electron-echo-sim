@@ -35,6 +35,9 @@ export class DatabaseManager {
       this.db.pragma('synchronous = NORMAL'); // 성능과 안정성의 균형
       this.db.pragma('foreign_keys = ON'); // 외래 키 제약 조건 활성화
 
+      // 마이그레이션 실행
+      this.runMigrations();
+
       console.log('[DatabaseManager] 데이터베이스 초기화 완료:', this.dbPath);
     } catch (error) {
       console.error('[DatabaseManager] 데이터베이스 초기화 실패:', error);
@@ -98,5 +101,52 @@ export class DatabaseManager {
    */
   isConnected(): boolean {
     return this.db !== null;
+  }
+
+  /**
+   * 데이터베이스 마이그레이션 실행
+   */
+  runMigrations(): void {
+    if (!this.db) {
+      throw new Error('데이터베이스가 초기화되지 않았습니다.');
+    }
+
+    try {
+      // SAR 시스템 설정 테이블 생성
+      if (!this.tableExists('sar_system_configs')) {
+        this.db.exec(`
+          CREATE TABLE sar_system_configs (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            fc REAL NOT NULL,
+            bw REAL NOT NULL,
+            fs REAL NOT NULL,
+            taup REAL NOT NULL,
+            prf REAL NOT NULL,
+            swst REAL NOT NULL,
+            swl REAL NOT NULL,
+            orbit_height REAL NOT NULL,
+            antenna_width REAL NOT NULL,
+            antenna_height REAL NOT NULL,
+            antenna_roll_angle REAL NOT NULL DEFAULT 0.0,
+            antenna_pitch_angle REAL NOT NULL DEFAULT 0.0,
+            antenna_yaw_angle REAL NOT NULL DEFAULT 0.0,
+            Pt REAL NOT NULL DEFAULT 1000.0,
+            G_recv REAL NOT NULL DEFAULT 1.0,
+            NF REAL NOT NULL DEFAULT 3.0,
+            Loss REAL NOT NULL DEFAULT 2.0,
+            Tsys REAL NOT NULL DEFAULT 290.0,
+            adc_bits INTEGER NOT NULL DEFAULT 12,
+            beam_id TEXT NOT NULL DEFAULT 'Beam0000',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        `);
+        console.log('[DatabaseManager] sar_system_configs 테이블 생성 완료');
+      }
+    } catch (error) {
+      console.error('[DatabaseManager] 마이그레이션 실행 실패:', error);
+      throw error;
+    }
   }
 }

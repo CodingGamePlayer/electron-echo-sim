@@ -24,6 +24,7 @@
         <div class="tab-buttons">
           <button class="tab-button active" data-tab="tle">TLE 입력</button>
           <button class="tab-button" data-tab="swath">SAR Swath</button>
+          <button class="tab-button" data-tab="sar-config">SAR 설정</button>
         </div>
 
         <!-- TLE 입력 탭 -->
@@ -126,6 +127,145 @@
               <input type="number" id="swathHeadingOffset" value="0" min="-180" max="180" step="1">
               <div class="info">Swath 방향을 조정합니다. 양수는 시계 방향, 음수는 반시계 방향입니다.</div>
             </label>
+          </div>
+        </div>
+
+        <!-- SAR 시스템 설정 탭 -->
+        <div id="sar-configTab" class="tab-content">
+          <div class="sidebar-section">
+            <h3>SAR 시스템 설정</h3>
+            
+            <label>
+              설정 이름:
+              <input type="text" id="sarConfigName" placeholder="설정 이름을 입력하세요" style="width: 100%;">
+            </label>
+
+            <div style="margin-top: 15px;">
+              <h4>기본 주파수 파라미터</h4>
+              <label>
+                반송파 주파수 (Hz):
+                <input type="number" id="sarConfigFc" value="5.4e9" step="1e6">
+              </label>
+              <label>
+                대역폭 (Hz):
+                <input type="number" id="sarConfigBw" value="150e6" step="1e6">
+              </label>
+              <label>
+                샘플링 주파수 (Hz):
+                <input type="number" id="sarConfigFs" value="250e6" step="1e6">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>펄스 파라미터</h4>
+              <label>
+                펄스 폭 (s):
+                <input type="number" id="sarConfigTaup" value="10e-6" step="1e-6">
+              </label>
+              <label>
+                펄스 반복 주파수 (Hz):
+                <input type="number" id="sarConfigPrf" value="5000" step="100">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>샘플링 윈도우 파라미터</h4>
+              <label>
+                샘플링 윈도우 시작 시간 (s):
+                <input type="number" id="sarConfigSwst" value="10e-6" step="1e-6">
+              </label>
+              <label>
+                샘플링 윈도우 길이 (s):
+                <input type="number" id="sarConfigSwl" value="50e-6" step="1e-6">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>위성 파라미터</h4>
+              <label>
+                궤도 높이 (m):
+                <input type="number" id="sarConfigOrbitHeight" value="517e3" step="1000">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>안테나 파라미터</h4>
+              <label>
+                안테나 폭 (m):
+                <input type="number" id="sarConfigAntennaWidth" value="4.0" step="0.1">
+              </label>
+              <label>
+                안테나 높이 (m):
+                <input type="number" id="sarConfigAntennaHeight" value="0.5" step="0.1">
+              </label>
+              <label>
+                안테나 롤 각도 (deg):
+                <input type="number" id="sarConfigAntennaRollAngle" value="0.0" step="0.1">
+              </label>
+              <label>
+                안테나 피치 각도 (deg):
+                <input type="number" id="sarConfigAntennaPitchAngle" value="0.0" step="0.1">
+              </label>
+              <label>
+                안테나 요 각도 (deg):
+                <input type="number" id="sarConfigAntennaYawAngle" value="0.0" step="0.1">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>전력 및 게인 파라미터</h4>
+              <label>
+                송신 전력 (W):
+                <input type="number" id="sarConfigPt" value="1000.0" step="10">
+              </label>
+              <label>
+                수신 안테나 게인:
+                <input type="number" id="sarConfigGRecv" value="1.0" step="0.1">
+              </label>
+              <label>
+                노이즈 지수 (dB):
+                <input type="number" id="sarConfigNF" value="3.0" step="0.1">
+              </label>
+              <label>
+                시스템 손실 (dB):
+                <input type="number" id="sarConfigLoss" value="2.0" step="0.1">
+              </label>
+              <label>
+                시스템 온도 (K):
+                <input type="number" id="sarConfigTsys" value="290.0" step="1">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>ADC 파라미터</h4>
+              <label>
+                ADC 비트 수:
+                <input type="number" id="sarConfigAdcBits" value="12" min="1" max="32" step="1">
+              </label>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>빔 파라미터</h4>
+              <label>
+                빔 ID:
+                <input type="text" id="sarConfigBeamId" value="Beam0000">
+              </label>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <button id="sarConfigSaveBtn" class="sidebar-section button" style="width: 100%;">설정 저장</button>
+            </div>
+
+            <div style="margin-top: 15px;">
+              <h4>저장된 설정 목록</h4>
+              <select id="sarConfigList" style="width: 100%; margin-bottom: 10px;" size="5">
+                <!-- 저장된 설정 목록이 동적으로 표시됨 -->
+              </select>
+              <div style="display: flex; gap: 5px;">
+                <button id="sarConfigLoadBtn" class="sidebar-section button" style="flex: 1;">불러오기</button>
+                <button id="sarConfigDeleteBtn" class="sidebar-section button" style="flex: 1;">삭제</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
