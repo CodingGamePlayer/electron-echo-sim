@@ -1,7 +1,7 @@
 import { CesiumViewerManager } from './CesiumViewerManager.js';
 import { SatelliteManager } from './SatelliteManager.js';
 import { EntityManager } from './EntityManager.js';
-import { UIManager } from './UIManager.js';
+import { UIManager } from './ui/UIManager.js';
 
 /**
  * App - 메인 애플리케이션 클래스
