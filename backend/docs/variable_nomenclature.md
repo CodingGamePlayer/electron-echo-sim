@@ -123,20 +123,25 @@ R_2way = R_tx + R_rx = 2R  (monostatic case)
 | `G_rx`, `gr` | 수신 안테나 게인 (Receive Antenna Gain) | - | - | `config.G_recv` |
 | `ant_gain` | 안테나 게인 (Antenna Gain) | - | - | - |
 | `loss` | 손실 (Loss) | - | `loss = NF + Loss` | `config.get_loss_linear()` |
-| `NF` | 노이즈 지수 (Noise Figure) | - | - | `config.NF` |
-| `Loss` | 시스템 손실 (System Loss) | - | - | `config.Loss` |
+| `loss_linear` | 손실 (선형 스케일) | - | `10^((NF + Loss) / 10)` | `config.get_loss_linear()` |
+| `NF` | 노이즈 지수 (Noise Figure) | dB | - | `config.NF` |
+| `Loss` | 시스템 손실 (System Loss) | dB | - | `config.Loss` |
 | `Tsys`, `tsys` | 시스템 온도 (System Temperature) | K | - | `config.Tsys` |
 | `noise_threshold` | 노이즈 임계값 | - | `sqrt(k_B * Tsys / N / num_pulses)` | `config.get_noise_threshold()` |
 | `c`, `c1` | 신호 계수 (Signal Coefficient) | - | `c = sqrt(Pt * λ² * G² / (4π)³ * R⁴ * σ)` | - |
 | `coeff` | 최종 계수 (Final Coefficient) | - | `coeff = c * exp(-j*2π*fc*td) * sqrt(G_rx)` | - |
 | `σ`, `sigma` | 반사도 (Reflectivity/RCS) | m² | - | `target.reflectivity` |
 | `atmospheric_loss` | 대기 손실 (Atmospheric Loss) | - | 기본값: 1 | - |
+| `path_loss` | 경로 손실 (Path Loss) | - | `(λ / (4π * R))²` | `calc_path_loss()` |
 
 ### Echo 신호 세기 계산 수식
 
 ```python
+# 손실을 선형 스케일로 변환
+loss_linear = 10.0 ** ((NF + Loss) / 10.0)
+
 # 기본 계수
-c1 = Pt * λ² * G² / ((4π)³ * loss * atmospheric_loss)
+c1 = Pt * λ² * G² / ((4π)³ * loss_linear * atmospheric_loss)
 
 # 타겟별 계수
 c = sqrt(c1 * σ / (R_2way/2)⁴)
@@ -147,15 +152,33 @@ coeff = c * exp(-j*2π*fc*td) * sqrt(G_rx)
 
 **수학적 표현:**
 ```
+L = 10^((NF + Loss) / 10)  (dB → linear)
 c1 = (Pt * λ² * G²) / ((4π)³ * L * L_atm)
 c = sqrt(c1 * σ / (R_2way/2)⁴)
 coeff = c * exp(-j*2π*fc*td) * sqrt(G_rx)
 ```
 
 여기서:
-- `L`: 시스템 손실 (linear scale)
-- `L_atm`: 대기 손실
+- `L`: 시스템 손실 (linear scale, `loss_linear`)
+- `L_atm`: 대기 손실 (`atmospheric_loss`)
 - `σ`: 타겟 반사도 (RCS)
+
+### 경로 손실 계산
+
+경로 손실은 자유 공간 전파 손실을 나타냅니다:
+
+```python
+path_loss = (wavelength / (4.0 * PI * (range_2way / 2.0))) ** 2
+```
+
+**수학적 표현:**
+```
+L_path = (λ / (4π * R))²
+```
+
+여기서:
+- `λ`: 파장
+- `R`: 단방향 거리 (`R_2way / 2`)
 
 ---
 
@@ -171,13 +194,18 @@ coeff = c * exp(-j*2π*fc*td) * sqrt(G_rx)
 | `look_angle` | 관측각 (Look Angle) | deg/rad | - | - |
 | `squint_angle` | 스퀸트 각 (Squint Angle) | deg/rad | - | - |
 | `incidence_angle` | 입사각 (Incidence Angle) | deg/rad | - | - |
-| `beam_vector` | 빔 벡터 (Beam Vector) | - | 3D 벡터 | - |
-| `bus_roll_deg` | 버스 롤 각도 | deg | - | - |
-| `bus_pitch_deg` | 버스 피치 각도 | deg | - | - |
-| `bus_yaw_deg` | 버스 요 각도 | deg | - | - |
-| `ant_roll_deg` | 안테나 롤 각도 | deg | - | `config.antenna_roll_angle` |
-| `ant_pitch_deg` | 안테나 피치 각도 | deg | - | `config.antenna_pitch_angle` |
-| `ant_yaw_deg` | 안테나 요 각도 | deg | - | `config.antenna_yaw_angle` |
+| `beam_vector` | 빔 벡터 (Beam Vector) | - | 3D 벡터 `[x, y, z]` | - |
+| `beam_direction` | 빔 방향 벡터 (Beam Direction Vector) | - | 정규화된 벡터 `[x, y, z]` | `beam_direction` |
+| `bus_roll_angle`, `bus_roll_deg` | 버스 롤 각도 (Bus Roll Angle) | deg | - | - |
+| `bus_pitch_angle`, `bus_pitch_deg` | 버스 피치 각도 (Bus Pitch Angle) | deg | - | - |
+| `bus_yaw_angle`, `bus_yaw_deg` | 버스 요 각도 (Bus Yaw Angle) | deg | - | - |
+| `ant_roll_angle`, `ant_roll_deg` | 안테나 롤 각도 (Antenna Roll Angle) | deg | - | `config.antenna_roll_angle` |
+| `ant_yaw_angle`, `ant_yaw_deg` | 안테나 요 각도 (Antenna Yaw Angle) | deg | - | `config.antenna_yaw_angle` |
+| `target_vectors` | 타겟 방향 벡터 (Target Direction Vectors) | m | `target_positions - satellite_position` | shape: `[num_targets, 3]` |
+| `target_distances` | 타겟까지의 거리 (Target Distances) | m | `||target_vectors||` | shape: `[num_targets]` |
+| `target_directions` | 타겟 방향 (정규화) (Target Directions) | - | `target_vectors / target_distances` | shape: `[num_targets, 3]` |
+| `cos_angle` | 빔 방향과 타겟 방향의 코사인 각도 | - | `dot(target_directions, beam_direction)` | - |
+| `angle` | 빔 방향과 타겟 방향의 각도 | rad | `arccos(clip(cos_angle, -1, 1))` | - |
 
 ### 빔폭 계산
 
@@ -192,6 +220,36 @@ beamwidth_el = (wavelength / antenna_height) * RAD2DEG
 θ_el ≈ λ / D_el  (radians)
 ```
 
+### 안테나 게인 계산 과정
+
+안테나 게인 계산에 사용되는 중간 변수들:
+
+```python
+# 타겟 방향 벡터 계산
+target_vectors = target_positions - satellite_position
+target_distances = np.linalg.norm(target_vectors, axis=1)
+target_directions = target_vectors / target_distances[:, np.newaxis]
+
+# 빔 방향과의 각도 계산
+cos_angle = np.dot(target_directions, beam_direction)
+angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
+
+# 가우시안 빔 모델로 게인 계산
+gain = max_gain * np.exp(-2.0 * (angle ** 2) / ((np.deg2rad(beamwidth_el) / 2) ** 2))
+```
+
+**수학적 표현:**
+```
+r_target = target_positions - satellite_position
+d_target = ||r_target||
+û_target = r_target / d_target
+
+cos(θ) = û_target · û_beam
+θ = arccos(cos(θ))
+
+G(θ) = G_max * exp(-2 * (θ / (θ_el/2))²)
+```
+
 ---
 
 ## 6. 위성 및 궤도 관련 변수
@@ -200,12 +258,128 @@ beamwidth_el = (wavelength / antenna_height) * RAD2DEG
 |--------|------|------|-----------|---------------|
 | `orbit_height` | 궤도 높이 (Orbit Height) | m | - | `config.orbit_height` |
 | `V`, `Vst` | 유효 비행 속도 (Effective Flight Speed) | m/s | - | - |
-| `pos_t` | 위성 위치 (Satellite Position) | m | ECEF 좌표 | `satellite_position` |
-| `vel_t` | 위성 속도 (Satellite Velocity) | m/s | ECEF 좌표 | `satellite_velocity` |
-| `att_t` | 위성 자세 (Satellite Attitude) | - | Quaternion | - |
-| `angv_t` | 각속도 (Angular Velocity) | rad/s | - | - |
-| `sat_pos` | 위성 위치 (간단 표기) | m | - | - |
-| `sat_vel` | 위성 속도 (간단 표기) | m/s | - | - |
+| `pos_t`, `satellite_position` | 위성 위치 (Satellite Position) | m | ECEF 좌표 `[x, y, z]` | `satellite_position` |
+| `vel_t`, `satellite_velocity` | 위성 속도 (Satellite Velocity) | m/s | ECEF 좌표 `[vx, vy, vz]` | `satellite_velocity` |
+| `beam_direction` | 빔 방향 벡터 (Beam Direction Vector) | - | 정규화된 벡터 `[x, y, z]` | `beam_direction` |
+| `att_t` | 위성 자세 (Satellite Attitude) | - | Quaternion `[q0, q1, q2, q3]` | - |
+| `angv_t` | 각속도 (Angular Velocity) | rad/s | `[ωx, ωy, ωz]` | - |
+| `sat_pos` | 위성 위치 (간단 표기) | m | ECEF 좌표 `[x, y, z]` | `satellite_position`과 동일 |
+| `sat_vel` | 위성 속도 (간단 표기) | m/s | ECEF 좌표 `[vx, vy, vz]` | `satellite_velocity`와 동일 |
+| `satellite_direction` | 위성 진행 방향 (Satellite Direction) | - | `velocity / ||velocity||` | 정규화된 속도 벡터 |
+| `X`, `Y`, `Z` | 위성 좌표계 방향 벡터 | - | `calc_direction_vector(pos, vel)` | `[X, Y, Z]` - X는 속도 방향 |
+| `latitude`, `lat` | 위도 (Latitude) | deg | ECEF → 지리 좌표 변환 | - |
+| `longitude`, `lon` | 경도 (Longitude) | deg | ECEF → 지리 좌표 변환 | - |
+| `altitude`, `height`, `h` | 고도 (Altitude/Height) | m | ECEF → 지리 좌표 변환 | - |
+
+### 위성 위치 및 방향 계산
+
+**중요:** `sat_pos` 또는 `satellite_position`는 **ECEF 좌표 `[x, y, z]` (미터)**로 주어지며, 이를 통해 다음을 모두 계산할 수 있습니다:
+
+1. **거리 계산**: 타겟까지의 거리 (`R = ||target_position - satellite_position||`)
+2. **안테나 게인 계산**: 타겟 방향 벡터 계산에 사용
+3. **빔 방향 계산**: 기본 빔 방향 (nadir 방향) 계산
+4. **지리 좌표 변환**: 위도, 경도, 고도로 변환 가능
+
+위성 위치와 방향은 Echo 신호 계산에 직접 사용됩니다:
+
+**ECEF 좌표에서 지리 좌표 변환:**
+위성 위치가 ECEF 좌표 `[x, y, z]` (미터)로 주어지면, 이를 위도/경도/고도로 변환할 수 있습니다:
+
+```python
+def ecef_to_llh_wgs84(xyz_m):
+    """ECEF 좌표 [x, y, z] (m) → [위도(deg), 경도(deg), 고도(m)]"""
+    x, y, z = float(xyz_m[0]), float(xyz_m[1]), float(xyz_m[2])
+    
+    # 경도 계산
+    lon = np.arctan2(y, x)
+    p = np.hypot(x, y)
+    
+    # 위도 계산 (반복법)
+    lat = np.arctan2(z, p * (1.0 - WGS84_E2))
+    for _ in range(6):
+        sin_lat = np.sin(lat)
+        N = WGS84_A / np.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
+        h = p / np.cos(lat) - N
+        lat = np.arctan2(z, p * (1.0 - WGS84_E2 * (N / (N + h))))
+    
+    # 최종 고도 계산
+    sin_lat = np.sin(lat)
+    N = WGS84_A / np.sqrt(1.0 - WGS84_E2 * sin_lat * sin_lat)
+    h = p / np.cos(lat) - N
+    
+    lat_deg = lat * 180.0 / np.pi
+    lon_deg = lon * 180.0 / np.pi
+    return np.array([lat_deg, lon_deg, h], dtype=np.double)
+```
+
+**수학적 표현:**
+```
+lon = arctan2(y, x)
+p = √(x² + y²)
+lat = arctan2(z, p * (1 - e²))  (반복법으로 정밀도 향상)
+h = p / cos(lat) - N
+```
+
+여기서:
+- `WGS84_A = 6378137.0` (m): 지구 장반경
+- `WGS84_F = 1/298.257223563`: 편평률
+- `WGS84_E2 = F * (2 - F)`: 이심률 제곱
+- `N = A / √(1 - e² * sin²(lat))`: 곡률 반경
+
+**위성 진행 방향 계산:**
+위성의 속도 벡터가 바로 위성이 나아가는 방향을 나타냅니다:
+
+```python
+# 속도 벡터를 정규화하여 단위 방향 벡터로 변환
+satellite_direction = satellite_velocity / np.linalg.norm(satellite_velocity)
+```
+
+**수학적 표현:**
+```
+û_satellite = v_satellite / ||v_satellite||
+```
+
+여기서:
+- `v_satellite`: 위성 속도 벡터 `[vx, vy, vz]`
+- `û_satellite`: 정규화된 위성 진행 방향 벡터
+
+**위성 좌표계 방향 벡터 (원본 코드):**
+원본 코드에서는 `calc_direction_vector(pos, vel)` 함수를 사용하여 위성 좌표계의 3개 방향 벡터를 계산합니다:
+
+```python
+X, Y, Z = calc_direction_vector(satellite_position, satellite_velocity)
+# X: 속도 방향 (위성이 나아가는 방향)
+# Y: 수직 방향 (위성 좌표계)
+# Z: 수직 방향 (위성 좌표계)
+```
+
+**거리 계산:**
+```python
+R = np.linalg.norm(target_position - satellite_position)
+```
+
+**빔 방향 (기본값):**
+```python
+if beam_direction is None:
+    # 지구 중심 방향 (nadir 방향)
+    beam_direction = -satellite_position / np.linalg.norm(satellite_position)
+```
+
+**안테나 게인 계산:**
+```python
+ant_gain = calc_antenna_gain_simple(
+    target_positions,
+    satellite_position,
+    beam_direction,
+    beamwidth_el,
+    beamwidth_az
+)
+```
+
+**대기 손실 계산:**
+```python
+atmospheric_loss = calc_atmospheric_loss(beam_direction, satellite_position)
+```
 
 ---
 
@@ -277,6 +451,8 @@ BW_fd = 2 * V / λ * beamwidth_az
 | `sample_pos` | 샘플 위치 (Sample Position) | - | `(td_amb - swst) * fs` | - |
 | `idx0`, `idx1` | 샘플 인덱스 | - | - | - |
 | `chirp_index` | Chirp 인덱스 | - | `((idx0 - sample_pos) * chirp_set_size)` | - |
+| `valid_mask` | 유효 타겟 마스크 (Valid Target Mask) | - | `c > noise_threshold` | boolean 배열, shape: `[num_targets]` |
+| `valid_indices` | 유효 타겟 인덱스 (Valid Target Indices) | - | `where(valid_mask)[0]` | 정수 배열 |
 
 ### 데이터 배열 구조
 
@@ -293,6 +469,23 @@ echo_signal: np.ndarray  # shape: [num_samples], dtype: complex64
 **Echo 신호 (여러 펄스):**
 ```python
 echo_signals: np.ndarray  # shape: [num_pulses, num_samples], dtype: complex64
+```
+
+### 유효성 검사
+
+Echo 신호 생성 시 노이즈 임계값 이상인 타겟만 처리합니다:
+
+```python
+# 노이즈 임계값 계산
+noise_threshold = config.get_noise_threshold(num_pulses=1)
+
+# 유효한 타겟 선택 (신호 계수가 임계값 이상)
+valid_mask = c > noise_threshold
+valid_indices = np.where(valid_mask)[0]
+
+# 유효한 타겟에 대해서만 Echo 신호 생성
+for idx in valid_indices:
+    # Echo 신호 계산...
 ```
 
 ---
@@ -349,15 +542,38 @@ echo(t) = Σ chirp(t - td_i) * coeff_i
 
 **Python 구현:**
 ```python
+# 손실을 선형 스케일로 변환
+loss_linear = 10.0 ** ((NF + Loss) / 10.0)
+
+# 거리 및 시간 지연 계산
 R_2way = 2.0 * R
 td = R_2way / LIGHT_SPEED
 td_amb = td % pri
 
-c1 = (Pt * wavelength**2 * ant_gain**2) / ((4*PI)**3 * loss * atmospheric_loss)
-c = np.sqrt(c1 * reflectivity / (R_2way/2)**4)
-coeff = c * np.exp(-1j*2*PI*fc*td) * np.sqrt(G_rx)
+# 안테나 게인 계산
+target_vectors = target_positions - satellite_position
+target_distances = np.linalg.norm(target_vectors, axis=1)
+target_directions = target_vectors / target_distances[:, np.newaxis]
+cos_angle = np.dot(target_directions, beam_direction)
+angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
+ant_gain = max_gain * np.exp(-2.0 * (angle ** 2) / ((np.deg2rad(beamwidth_el) / 2) ** 2))
 
-echo_signal[idx0:idx1] += chirp_signal * coeff
+# 신호 계수 계산
+c1 = (Pt * wavelength**2 * ant_gain**2) / ((4*PI)**3 * loss_linear * atmospheric_loss)
+c = np.sqrt(c1 * reflectivity / (R_2way/2)**4)
+
+# 유효성 검사
+noise_threshold = np.sqrt(BOLZMAN_CONST * Tsys / num_samples / num_pulses)
+valid_mask = c > noise_threshold
+valid_indices = np.where(valid_mask)[0]
+
+# 유효한 타겟에 대해 Echo 신호 생성
+for idx in valid_indices:
+    coeff = c[idx] * np.exp(-1j*2*PI*fc*td[idx]) * np.sqrt(G_rx)
+    sample_pos = (td_amb[idx] - swst) * fs
+    idx0 = int(np.ceil(sample_pos))
+    idx1 = idx0 + len(chirp_signal)
+    echo_signal[idx0:idx1] += chirp_signal * coeff
 ```
 
 ### 11.3 거리 해상도
@@ -378,7 +594,40 @@ BW_fd = 2 * V / λ * beamwidth_az
 rank = ceil((2*R/c - swst) * prf)
 ```
 
-### 11.6 노이즈 임계값
+### 11.6 손실 변환 (dB → Linear)
+
+```
+L_linear = 10^((NF + Loss) / 10)
+```
+
+여기서:
+- `NF`: 노이즈 지수 (dB)
+- `Loss`: 시스템 손실 (dB)
+- `L_linear`: 선형 스케일 손실 (`loss_linear`)
+
+### 11.7 안테나 게인 계산
+
+```
+r_target = target_positions - satellite_position
+d_target = ||r_target||
+û_target = r_target / d_target
+
+cos(θ) = û_target · û_beam
+θ = arccos(clip(cos(θ), -1, 1))
+
+G(θ) = G_max * exp(-2 * (θ / (θ_el/2))²)
+```
+
+여기서:
+- `r_target`: 타겟 방향 벡터 (`target_vectors`)
+- `d_target`: 타겟까지의 거리 (`target_distances`)
+- `û_target`: 정규화된 타겟 방향 (`target_directions`)
+- `û_beam`: 빔 방향 벡터 (`beam_direction`)
+- `θ`: 빔 방향과 타겟 방향의 각도 (`angle`)
+- `θ_el`: 고도 빔폭 (`beamwidth_el`)
+- `G_max`: 최대 게인
+
+### 11.8 노이즈 임계값
 
 ```
 noise_threshold = sqrt(k_B * Tsys / N / num_pulses)
@@ -387,7 +636,7 @@ noise_threshold = sqrt(k_B * Tsys / N / num_pulses)
 여기서:
 - `k_B`: 볼츠만 상수
 - `Tsys`: 시스템 온도
-- `N`: 샘플 수
+- `N`: 샘플 수 (`num_samples`)
 - `num_pulses`: 펄스 개수
 
 ---
@@ -447,3 +696,8 @@ td_amb = td % config.pri
 
 - 2026-01-24: 초기 문서 작성
 - 기존 코드(`echo_sim_cmd_2026_0109_정해찬/`) 분석 기반으로 작성
+- 2026-01-24: 백엔드 코드 분석 기반 변수 추가
+  - 섹션 4: `loss_linear`, `path_loss` 추가
+  - 섹션 5: 안테나 게인 계산 중간 변수 추가 (`target_vectors`, `target_distances`, `target_directions`, `cos_angle`, `angle`)
+  - 섹션 9: 유효성 검사 변수 추가 (`valid_mask`, `valid_indices`)
+  - 섹션 11: 손실 변환 및 안테나 게인 계산 과정 보완

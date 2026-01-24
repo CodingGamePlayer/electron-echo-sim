@@ -123,8 +123,12 @@ class EchoGenerator:
         # 노이즈 임계값
         noise_threshold = self.config.get_noise_threshold(num_pulses=1)
         
-        # 유효한 타겟만 선택 (노이즈 임계값 이상)
-        valid_mask = c > noise_threshold
+        # 시간 조건 체크 (기존 코드와 동일: td >= swst - taup & td < swet)
+        # 단일 펄스의 경우 na=0이므로: td >= swst - taup & td < swet
+        time_valid = (td >= (self.config.swst - self.config.taup)) & (td < (self.config.swst + self.config.swl))
+        
+        # 유효한 타겟만 선택 (노이즈 임계값 이상 & 시간 조건 만족)
+        valid_mask = (c > noise_threshold) & time_valid
         valid_indices = np.where(valid_mask)[0]
         
         if len(valid_indices) == 0:
@@ -136,9 +140,11 @@ class EchoGenerator:
         # 각 타겟에 대해 Echo 신호 생성
         for idx in valid_indices:
             # 최종 계수
-            # coeff = c * exp(-j*2π*fc*td) * sqrt(G_rx)
-            coeff = (c[idx] * np.exp(-1j * 2.0 * PI * self.config.fc * td[idx]) *
-                     sqrt(self.config.G_recv))
+            # coeff = c * exp(-j*2π*fc*td)
+            # 주의: c1 계산에서 이미 ant_gain² (G_tx * G_rx)를 사용했으므로
+            # 여기서 sqrt(G_rx)를 다시 곱하면 안 됨
+            # ant_gain은 타겟 방향에 따른 안테나 게인 (monostatic이므로 G_tx = G_rx = ant_gain)
+            coeff = c[idx] * np.exp(-1j * 2.0 * PI * self.config.fc * td[idx])
             
             # 샘플 위치 계산
             sample_pos = (td_amb[idx] - self.config.swst) * self.config.fs

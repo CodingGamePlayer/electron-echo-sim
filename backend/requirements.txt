@@ -3,6 +3,7 @@ scipy>=1.7.0
 astropy>=5.0.0
 h5py>=3.0.0
 pytest>=7.0.0
+matplotlib>=3.5.0  # 시각화용
 
 # API 서버 의존성
 fastapi>=0.104.0
