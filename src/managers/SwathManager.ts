@@ -2,7 +2,6 @@ import {
   SARSwathGeometry, 
   SwathMode, 
   SwathVisualizationOptions,
-  SwathDataSource,
   SwathInstance,
   SwathCorners
 } from '../types/sar-swath.types.js';
@@ -220,36 +219,6 @@ export class SwathManager {
     return swathIds;
   }
 
-  /**
-   * ✅ Case 4: 과거 경로 Swath (이력)
-   */
-  addHistoricalSwath(
-    historicalPositions: Array<{
-      time: number;
-      latitude: number;
-      longitude: number;
-      altitude: number;
-      heading: number;
-    }>,
-    swathParams: {
-      nearRange?: number;
-      farRange?: number;
-      swathWidth?: number;
-      azimuthLength?: number;
-    } = {},
-    options?: Partial<SwathVisualizationOptions>
-  ): string[] {
-    const opts = { 
-      ...SwathManager.DEFAULT_OPTIONS, 
-      ...options, 
-      mode: SwathMode.HISTORICAL,
-      color: 'GRAY', // 과거 데이터는 회색
-      alpha: 0.2,
-    };
-
-    // 예측 경로와 동일한 로직 사용
-    return this.addPredictedPathSwath(historicalPositions, swathParams, opts);
-  }
 
   /**
    * ✅ Case 5: Backend API 기반 Swath (시뮬레이션 결과)

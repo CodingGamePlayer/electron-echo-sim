@@ -63,7 +63,6 @@ html, body, #cesiumContainer {
   transition: opacity 0.3s ease;
 }
 
-
 #swathGroupsContent {
   flex: 1;
   overflow-y: auto;
@@ -347,28 +346,11 @@ html, body, #cesiumContainer {
   background: #45a049;
 }
 
-.sidebar-section button.danger {
-  background: #f44336;
-}
-
-.sidebar-section button.danger:hover {
-  background: #da190b;
-}
-
 .sidebar-section .info {
   font-size: 11px;
   color: #aaa;
   margin-top: 5px;
   line-height: 1.4;
-}
-
-.sidebar-section .row {
-  display: flex;
-  gap: 10px;
-}
-
-.sidebar-section .row > * {
-  flex: 1;
 }
 
 .sidebar-section h4 {

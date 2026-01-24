@@ -1,6 +1,6 @@
 import { SatelliteManager } from './SatelliteManager.js';
 import { EntityManager } from './EntityManager.js';
-import { SwathMode, SARSwathGeometry } from './types/sar-swath.types.js';
+import { SARSwathGeometry } from './types/sar-swath.types.js';
 
 /**
  * UIManager - UI 이벤트 처리
@@ -308,103 +308,37 @@ export class UIManager {
 
 
   /**
-   * 모드에 따라 Swath 추가
+   * 정적 Swath 추가
    */
-  private async addSwathByMode(
-    mode: string,
+  private addStaticSwath(
     options: any,
     swathParams: any
-  ): Promise<void> {
+  ): void {
     try {
-      switch (mode) {
-        case 'static': {
-          // 현재 위성 위치 기반으로 Swath 생성
-          const currentPosition = this.entityManager.getCurrentSatellitePosition();
-          if (!currentPosition) {
-            alert('위성 위치를 가져올 수 없습니다. TLE가 활성화되어 있는지 확인하세요.');
-            return;
-          }
-
-          const geometry: SARSwathGeometry = {
-            centerLat: currentPosition.latitude,
-            centerLon: currentPosition.longitude,
-            heading: currentPosition.heading,
-            nearRange: swathParams.nearRange,
-            farRange: swathParams.farRange,
-            swathWidth: swathParams.swathWidth,
-            azimuthLength: swathParams.azimuthLength,
-            satelliteAltitude: currentPosition.altitude,
-          };
-          this.entityManager.addStaticSwath(geometry, options);
-          break;
-        }
-        case 'realtime_tracking':
-          this.entityManager.startRealtimeSwathTracking(swathParams, options);
-          break;
-        case 'predicted_path': {
-          const hoursInput = document.getElementById('predictedHours') as HTMLInputElement;
-          const hours = parseFloat(hoursInput?.value || '4');
-          this.entityManager.addPredictedSwathPath(hours);
-          break;
-        }
-        case 'historical':
-          // 과거 경로는 예측 경로와 동일한 방식으로 처리
-          console.warn('과거 경로 기능은 아직 구현되지 않았습니다.');
-          break;
-        case 'backend_api': {
-          const apiEndpoint = (document.getElementById('apiEndpoint') as HTMLInputElement)?.value || 'http://localhost:8000';
-          const simulationId = (document.getElementById('simulationId') as HTMLInputElement)?.value || '';
-          if (!simulationId) {
-            alert('Simulation ID를 입력하세요.');
-            return;
-          }
-          await this.entityManager.addBackendAPISwath(apiEndpoint, simulationId, options);
-          break;
-        }
-        case 'custom_geometry': {
-          const topLeft = (document.getElementById('customTopLeft') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
-          const topRight = (document.getElementById('customTopRight') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
-          const bottomRight = (document.getElementById('customBottomRight') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
-          const bottomLeft = (document.getElementById('customBottomLeft') as HTMLInputElement)?.value.split(',').map(v => parseFloat(v.trim()));
-          
-          if (!topLeft || !topRight || !bottomRight || !bottomLeft) {
-            alert('모든 코너 좌표를 입력하세요.');
-            return;
-          }
-
-          const swathManager = this.entityManager.getSwathManager();
-          swathManager.addCustomGeometrySwath(
-            {
-              topLeft: [topLeft[0], topLeft[1]],
-              topRight: [topRight[0], topRight[1]],
-              bottomRight: [bottomRight[0], bottomRight[1]],
-              bottomLeft: [bottomLeft[0], bottomLeft[1]],
-            },
-            options
-          );
-          break;
-        }
+      // 현재 위성 위치 기반으로 Swath 생성
+      const currentPosition = this.entityManager.getCurrentSatellitePosition();
+      if (!currentPosition) {
+        alert('위성 위치를 가져올 수 없습니다. TLE가 활성화되어 있는지 확인하세요.');
+        return;
       }
+
+      const geometry: SARSwathGeometry = {
+        centerLat: currentPosition.latitude,
+        centerLon: currentPosition.longitude,
+        heading: currentPosition.heading,
+        nearRange: swathParams.nearRange,
+        farRange: swathParams.farRange,
+        swathWidth: swathParams.swathWidth,
+        azimuthLength: swathParams.azimuthLength,
+        satelliteAltitude: currentPosition.altitude,
+      };
+      this.entityManager.addStaticSwath(geometry, options);
     } catch (error: any) {
       console.error('Swath 추가 실패:', error);
       alert('Swath 추가 실패: ' + error.message);
     }
   }
 
-  /**
-   * 문자열을 SwathMode enum으로 변환
-   */
-  private getSwathModeFromString(mode: string): SwathMode {
-    switch (mode) {
-      case 'static': return SwathMode.STATIC;
-      case 'realtime_tracking': return SwathMode.REALTIME_TRACKING;
-      case 'predicted_path': return SwathMode.PREDICTED_PATH;
-      case 'historical': return SwathMode.HISTORICAL;
-      case 'backend_api': return SwathMode.BACKEND_API;
-      case 'custom_geometry': return SwathMode.CUSTOM_GEOMETRY;
-      default: return SwathMode.STATIC;
-    }
-  }
 
   /**
    * 실시간 추적이 실행 중일 때 옵션 변경 시 즉시 적용
@@ -533,8 +467,7 @@ export class UIManager {
       const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
       const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
 
-          this.addSwathByMode(
-            'static',
+          this.addStaticSwath(
             {
               color: swathColor?.value || 'PURPLE',
               alpha: parseFloat(swathAlpha?.value || '0.001'),

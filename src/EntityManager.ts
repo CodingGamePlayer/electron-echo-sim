@@ -1,5 +1,4 @@
 import { SatelliteManager } from './SatelliteManager.js';
-import { SARSwathCalculator } from './utils/sar-swath-calculator.js';
 import { SARSwathGeometry, SwathMode } from './types/sar-swath.types.js';
 import { SwathManager } from './managers/SwathManager.js';
 import { SwathGroupManager } from './managers/SwathGroupManager.js';
@@ -17,10 +16,6 @@ export class EntityManager {
   private currentCartesian: any;
   private postRenderHandler: (() => void) | null;
   private predictedPathEntity: any;
-  private swathPrimitives: any[];
-  private swathEntities: any[];
-  private showSwath: boolean;
-  private swathGeometry: SARSwathGeometry | null;
   private lastSwathUpdateTime: number;
   private realtimeSwathId: string | null;
   private headingOffset: number; // Swath 방향 조정을 위한 heading 오프셋 (도)
@@ -44,10 +39,6 @@ export class EntityManager {
     this.position = null;
     this.currentCartesian = null;
     this.postRenderHandler = null;
-    this.swathPrimitives = [];
-    this.swathEntities = [];
-    this.showSwath = false;
-    this.swathGeometry = null;
     this.lastSwathUpdateTime = 0;
     this.realtimeSwathId = null;
     this.headingOffset = 0; // 기본값: 오프셋 없음
@@ -280,154 +271,9 @@ export class EntityManager {
   }
 
   /**
-   * SAR Swath 시각화 설정
-   * @param geometry SAR Swath 기하 파라미터
-   * @param show 표시 여부
-   */
-  setSwathGeometry(geometry: SARSwathGeometry, show: boolean = true): void {
-    this.swathGeometry = geometry;
-    this.showSwath = show;
-    
-    if (show) {
-      // 새로운 Swath 추가 (기존 것은 유지)
-      this.updateSwathVisualization();
-    } else {
-      // 표시 중지 (기존 Swath는 유지, 더 이상 새로 생성하지 않음)
-    }
-  }
-
-  /**
-   * SAR Swath 표시/숨김 토글 (호환성 유지 - 실시간 추적 모드로 동작)
-   */
-  toggleSwath(show?: boolean): void {
-    if (show !== undefined) {
-      this.showSwath = show;
-    } else {
-      this.showSwath = !this.showSwath;
-    }
-
-    if (this.showSwath) {
-      // 실시간 추적 모드로 시작
-      this.startRealtimeSwathTracking();
-    } else {
-      // 실시간 추적 중지
-      this.stopRealtimeSwathTracking();
-    }
-  }
-
-  /**
-   * SAR Swath 시각화 업데이트 (새로운 Swath 추가, 기존 것은 유지)
-   */
-  private updateSwathVisualization(): void {
-    if (!this.swathGeometry) {
-      console.warn('Swath geometry가 없습니다.');
-      return;
-    }
-
-    // 코너 계산
-    const corners = SARSwathCalculator.calculateSwathCorners(this.swathGeometry);
-    const positions = SARSwathCalculator.cornersToCartesian(corners);
-    
-    console.log('SAR Swath 생성:', {
-      geometry: this.swathGeometry,
-      corners: corners,
-      positionsCount: positions.length,
-      totalSwaths: this.swathEntities.length + 1
-    });
-
-    // Entity 방식 사용 (더 안정적이고 즉시 표시됨)
-    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
-    const adjustedAlpha = Math.min(0.6 * 0.3, 0.15);
-    const newSwathEntity = this.viewer.entities.add({
-      name: `SAR Swath ${this.swathEntities.length + 1}`,
-      polygon: {
-        hierarchy: positions,
-        material: Cesium.Color.CYAN.withAlpha(adjustedAlpha),
-        outline: false,
-        classificationType: Cesium.ClassificationType.TERRAIN, // 지형에 드레이프
-        height: 0,
-        extrudedHeight: 0,
-      },
-    });
-    this.swathEntities.push(newSwathEntity);
-    
-    console.log('Entity로 Swath 생성 성공 (총 ' + this.swathEntities.length + '개)', {
-      positions: positions.map(p => {
-        const carto = Cesium.Cartographic.fromCartesian(p);
-        return {
-          lon: Cesium.Math.toDegrees(carto.longitude),
-          lat: Cesium.Math.toDegrees(carto.latitude)
-        };
-      })
-    });
-    
-    // GroundPrimitive 방식도 시도 (지형에 더 정확하게 밀착)
-    // 겹칠 때 진해지지 않도록 투명도를 낮춤 (최대 0.15로 제한)
-    const primitiveAdjustedAlpha = Math.min(0.4 * 0.3, 0.15);
-    try {
-      const newSwathPrimitive = new Cesium.GroundPrimitive({
-        geometryInstances: new Cesium.GeometryInstance({
-          geometry: new Cesium.PolygonGeometry({
-            polygonHierarchy: new Cesium.PolygonHierarchy(positions),
-            perPositionHeight: false, // 지형에 밀착
-          }),
-          attributes: {
-            color: Cesium.ColorGeometryInstanceAttribute.fromColor(
-              Cesium.Color.CYAN.withAlpha(primitiveAdjustedAlpha)
-            ),
-          },
-        }),
-        appearance: new Cesium.PerInstanceColorAppearance({
-          translucent: true,
-          closed: true,
-        }),
-      });
-
-      this.viewer.scene.primitives.add(newSwathPrimitive);
-      this.swathPrimitives.push(newSwathPrimitive);
-      
-      // GroundPrimitive가 준비될 때까지 대기
-      newSwathPrimitive.readyPromise.then(() => {
-        console.log('GroundPrimitive 준비 완료 (총 ' + this.swathPrimitives.length + '개)');
-      }).catch((error: any) => {
-        console.warn('GroundPrimitive 준비 실패:', error);
-      });
-    } catch (error) {
-      console.warn('GroundPrimitive 생성 실패, Entity만 사용:', error);
-    }
-  }
-
-  /**
-   * SAR Swath 시각화 제거 (모든 Swath 제거)
-   */
-  private removeSwathVisualization(): void {
-    // 모든 Primitives 제거
-    this.swathPrimitives.forEach(primitive => {
-      try {
-        this.viewer.scene.primitives.remove(primitive);
-      } catch (error) {
-        console.warn('Primitive 제거 실패:', error);
-      }
-    });
-    this.swathPrimitives = [];
-
-    // 모든 Entities 제거
-    this.swathEntities.forEach(entity => {
-      try {
-        this.viewer.entities.remove(entity);
-      } catch (error) {
-        console.warn('Entity 제거 실패:', error);
-      }
-    });
-    this.swathEntities = [];
-  }
-
-  /**
    * 모든 Swath 제거 (외부에서 호출 가능)
    */
   clearAllSwaths(): void {
-    // 기존 방식과 SwathManager 방식 모두 제거
-    this.removeSwathVisualization();
     this.swathManager.clearAllSwaths();
   }
 
@@ -627,109 +473,6 @@ export class EntityManager {
     return this.swathGroupManager;
   }
 
-  /**
-   * 위성 위치 기반 SAR Swath 자동 업데이트
-   * 위성의 현재 위치와 속도 벡터를 기반으로 Swath 계산
-   */
-  updateSwathFromSatellitePosition(
-    swathWidth: number = 400000,      // 400km
-    nearRange: number = 200000,      // 200km
-    farRange: number = 800000,       // 800km
-    azimuthLength: number = 50000    // 50km (더 크게 표시)
-  ): void {
-    if (!this.currentCartesian || !this.entity) {
-      console.warn('Swath 업데이트 실패: 위성 위치 또는 엔티티가 없습니다.');
-      return;
-    }
-
-    // 현재 위치를 위도/경도로 변환
-    const cartographic = Cesium.Cartographic.fromCartesian(this.currentCartesian);
-    const centerLat = Cesium.Math.toDegrees(cartographic.latitude);
-    const centerLon = Cesium.Math.toDegrees(cartographic.longitude);
-    const satelliteAltitude = cartographic.height; // 위성 고도 (meters)
-
-    // 속도 벡터로부터 heading 계산
-    let heading = 0;
-    
-    // TLE 기반 속도 벡터 계산 (지표면 좌표 사용)
-    if (this.satelliteManager.useTLE) {
-      const currentTime = this.viewer.clock.currentTime;
-      const position1 = this.satelliteManager.calculatePosition(currentTime);
-      const futureTime = Cesium.JulianDate.addSeconds(currentTime, 10, new Cesium.JulianDate()); // 10초 후
-      const position2 = this.satelliteManager.calculatePosition(futureTime);
-      
-      if (position1 && position2) {
-        // 위도/경도 차이로부터 heading 계산 (지표면 기준)
-        const dLon = (position2.longitude - position1.longitude) * Math.PI / 180;
-        const lat1Rad = position1.latitude * Math.PI / 180;
-        const lat2Rad = position2.latitude * Math.PI / 180;
-        
-        // 대권 항법 공식 사용
-        const y = Math.sin(dLon) * Math.cos(lat2Rad);
-        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
-                  Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLon);
-        
-        const headingRad = Math.atan2(y, x);
-        heading = Cesium.Math.toDegrees(headingRad);
-        
-        // 0-360도 범위로 정규화
-        if (heading < 0) heading += 360;
-      }
-    } else if (this.entity.orientation && this.entity.orientation.getValue) {
-      // Orientation 기반 heading 계산 (대안)
-      const orientation = this.entity.orientation.getValue(Cesium.JulianDate.now());
-      if (orientation) {
-        const matrix = Cesium.Matrix3.fromQuaternion(orientation);
-        const forward = Cesium.Matrix3.getColumn(matrix, 0, new Cesium.Cartesian3());
-        
-        // 지표면에 투영
-        const up = Cesium.Cartographic.fromCartesian(this.currentCartesian);
-        const upVector = Cesium.Cartesian3.fromRadians(up.longitude, up.latitude, 0);
-        const east = Cesium.Cartesian3.cross(Cesium.Cartesian3.UNIT_Z, upVector, new Cesium.Cartesian3());
-        Cesium.Cartesian3.normalize(east, east);
-        const north = Cesium.Cartesian3.cross(upVector, east, new Cesium.Cartesian3());
-        Cesium.Cartesian3.normalize(north, north);
-        
-        const headingRad = Math.atan2(
-          Cesium.Cartesian3.dot(forward, east),
-          Cesium.Cartesian3.dot(forward, north)
-        );
-        heading = Cesium.Math.toDegrees(headingRad);
-        if (heading < 0) heading += 360;
-      }
-    }
-
-    // Heading 오프셋 적용
-    heading = (heading + this.headingOffset) % 360;
-    if (heading < 0) heading += 360;
-
-    // Swath 기하 파라미터 생성
-    // SAR는 side-looking이므로, Swath 중심은 위성의 nadir point에서 
-    // look direction으로 offset된 위치입니다.
-    // 여기서는 간단히 위성의 nadir point를 중심으로 사용하되,
-    // 실제로는 look angle과 slant range를 고려해야 합니다.
-    const geometry: SARSwathGeometry = {
-      centerLat,
-      centerLon,
-      heading,
-      nearRange,
-      farRange,
-      swathWidth,
-      azimuthLength,
-      satelliteAltitude: satelliteAltitude,
-      lookAngle: 30, // 기본 look angle (degrees), 실제 SAR 시스템에 맞게 조정 가능
-    };
-
-    console.log('Swath 기하 파라미터:', geometry);
-    this.setSwathGeometry(geometry, this.showSwath);
-  }
-
-  /**
-   * Swath 표시 여부 반환
-   */
-  isSwathVisible(): boolean {
-    return this.showSwath;
-  }
 
   /**
    * ✅ 현재 위성 위치와 heading 반환
