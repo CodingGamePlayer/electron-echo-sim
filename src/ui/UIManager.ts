@@ -5,6 +5,7 @@ import { SwathControlUIManager } from './SwathControlUIManager.js';
 import { SwathGroupsUIManager } from './SwathGroupsUIManager.js';
 import { SarConfigUIManager } from './SarConfigUIManager.js';
 import { SignalVisualizationPanel } from './SignalVisualizationPanel.js';
+import { SatelliteOrientationUIManager } from './SatelliteOrientationUIManager.js';
 
 /**
  * UIManager - UI 이벤트 처리 통합 관리
@@ -18,6 +19,7 @@ export class UIManager {
   private swathGroupsUIManager: SwathGroupsUIManager;
   private sarConfigUIManager: SarConfigUIManager;
   private signalVisualizationPanel: SignalVisualizationPanel;
+  private satelliteOrientationUIManager: SatelliteOrientationUIManager;
 
   constructor(satelliteManager: SatelliteManager, entityManager: EntityManager, viewer?: any) {
     this.satelliteManager = satelliteManager;
@@ -34,9 +36,13 @@ export class UIManager {
     );
     this.swathGroupsUIManager = new SwathGroupsUIManager(entityManager);
     
-              // Signal 시각화 패널 초기화
-              this.signalVisualizationPanel = new SignalVisualizationPanel();
-              this.swathControlUIManager.setSignalVisualizationPanel(this.signalVisualizationPanel);
+    // Signal 시각화 패널 초기화
+    this.signalVisualizationPanel = new SignalVisualizationPanel();
+    this.swathControlUIManager.setSignalVisualizationPanel(this.signalVisualizationPanel);
+    
+    // 위성 방향 제어 UI 초기화
+    const satelliteEntityManager = entityManager.getSatelliteEntityManager();
+    this.satelliteOrientationUIManager = new SatelliteOrientationUIManager(satelliteEntityManager);
   }
 
   /**
@@ -55,6 +61,9 @@ export class UIManager {
     this.sarConfigUIManager.initialize((sarConfig) => {
       this.swathControlUIManager.applySarConfigToSwathParams(sarConfig);
     });
+    
+    // 위성 방향 제어 UI 초기화
+    this.satelliteOrientationUIManager.initialize();
   }
 
   /**

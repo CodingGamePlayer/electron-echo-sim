@@ -344,4 +344,11 @@ export class EntityManager {
   setAxisLength(length: number): void {
     this.satelliteEntityManager.setAxisLength(length);
   }
+
+  /**
+   * SatelliteEntityManager 가져오기
+   */
+  getSatelliteEntityManager(): SatelliteEntityManager {
+    return this.satelliteEntityManager;
+  }
 }

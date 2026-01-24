@@ -45,6 +45,50 @@
               <div class="info">위성 고도를 조정합니다. 양수는 고도 증가, 음수는 고도 감소입니다.</div>
             </label>
           </div>
+
+          <!-- 위성 방향 제어 섹션 -->
+          <div class="sidebar-section" style="margin-top: 20px;">
+            <h3>위성 방향 제어</h3>
+            <label style="margin-bottom: 15px;">
+              <input type="checkbox" id="useCustomOrientation"> 커스텀 방향 사용
+              <div class="info">체크하면 Yaw, Pitch, Roll을 수동으로 제어할 수 있습니다.</div>
+            </label>
+
+            <div style="margin-bottom: 15px;">
+              <label>
+                Yaw (Z축 회전) - 좌우 방향 트는 회전:
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                  <input type="range" id="satelliteYaw" min="-180" max="180" step="0.1" value="0" style="flex: 1;">
+                  <span id="satelliteYawValue" style="min-width: 50px; text-align: right;">0.0°</span>
+                </div>
+                <div class="info">SAR 관측 방향이 앞/뒤로 살짝 바뀝니다. Azimuth 위치 오차 발생.</div>
+              </label>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <label>
+                Pitch (Y축 회전) - 위아래 고개 드는 회전:
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                  <input type="range" id="satellitePitch" min="-90" max="90" step="0.1" value="0" style="flex: 1;">
+                  <span id="satellitePitchValue" style="min-width: 50px; text-align: right;">0.0°</span>
+                </div>
+                <div class="info">레이더 입사각 변화. Incidence angle 변화 및 Range 위치 오차 발생.</div>
+              </label>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+              <label>
+                Roll (X축 회전) - 좌우 기울어짐 ⭐ SAR에서 가장 중요:
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                  <input type="range" id="satelliteRoll" min="-90" max="90" step="0.1" value="0" style="flex: 1;">
+                  <span id="satelliteRollValue" style="min-width: 50px; text-align: right;">0.0°</span>
+                </div>
+                <div class="info">SAR 빔이 좌우로 이동. Range 방향 위치 오차, 스와스 이동, 간섭계(InSAR) 오차 발생.</div>
+              </label>
+            </div>
+
+            <button id="resetOrientation" class="sidebar-section button" style="width: 100%; margin-top: 10px;">방향 리셋</button>
+          </div>
         </div>
 
         <!-- SAR 시스템 설정 탭 -->
