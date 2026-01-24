@@ -3,3 +3,10 @@ scipy>=1.7.0
 astropy>=5.0.0
 h5py>=3.0.0
 pytest>=7.0.0
+
+# API 서버 의존성
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+python-multipart>=0.0.6
+httpx>=0.24.0  # 테스트 클라이언트용
