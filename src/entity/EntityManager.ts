@@ -34,7 +34,7 @@ export class EntityManager {
     this.headingOffset = 0;
     this.altitudeOffset = 0;
 
-    this.satelliteEntityManager = new SatelliteEntityManager(viewer);
+    this.satelliteEntityManager = new SatelliteEntityManager(viewer, satelliteManager);
     this.positionUpdateManager = new PositionUpdateManager(viewer, satelliteManager, this.satelliteEntityManager);
     this.predictedPathManager = new PredictedPathManager(viewer, satelliteManager);
     this.headingCalculator = new HeadingCalculator(satelliteManager, viewer);
@@ -329,5 +329,19 @@ export class EntityManager {
    */
   clearSwathPreview(): void {
     this.swathPreviewManager.clearSwathPreview();
+  }
+
+  /**
+   * 축 방향선 표시/숨김 설정
+   */
+  setAxisLinesVisible(visible: boolean): void {
+    this.satelliteEntityManager.setAxisLinesVisible(visible);
+  }
+
+  /**
+   * 축 길이 설정
+   */
+  setAxisLength(length: number): void {
+    this.satelliteEntityManager.setAxisLength(length);
   }
 }
