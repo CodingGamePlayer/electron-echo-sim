@@ -29,6 +29,11 @@ export class CesiumViewerManager {
       fullscreenButton: false, // 전체화면 버튼 숨기기
     });
 
+    // Attribution/Credit 컨테이너 숨기기
+    if (this.viewer.cesiumWidget && this.viewer.cesiumWidget.creditContainer) {
+      this.viewer.cesiumWidget.creditContainer.style.display = 'none';
+    }
+
     // 클럭 설정
     this.viewer.clock.shouldAnimate = true;
     this.viewer.clock.multiplier = 1.0;

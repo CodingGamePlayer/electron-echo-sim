@@ -5,8 +5,9 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && tsc -p tsconfig.preload.json",
+    "build:watch": "concurrently \"tsc --watch\" \"tsc -p tsconfig.preload.json --watch\"",
     "start": "npm run build && electron .",
-    "dev": "npm run build && electron .",
+    "dev": "concurrently \"npm run build:watch\" \"wait-on dist/main.js dist/preload.js && electron .\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,9 +19,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.10",
+    "concurrently": "^9.1.2",
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wait-on": "^8.0.1"
   },
   "dependencies": {
     "cesium": "^1.137.0"
