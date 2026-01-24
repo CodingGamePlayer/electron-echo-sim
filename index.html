@@ -135,6 +135,18 @@
           <div class="sidebar-section">
             <h3>SAR 시스템 설정</h3>
             
+            <div style="margin-bottom: 20px;">
+              <h4>저장된 설정 목록</h4>
+              <select id="sarConfigList" style="width: 100%; margin-bottom: 10px;" size="5">
+                <!-- 저장된 설정 목록이 동적으로 표시됨 -->
+              </select>
+              <div style="display: flex; gap: 5px;">
+                <button id="sarConfigNewBtn" class="sidebar-section button" style="flex: 1;">새 설정</button>
+                <button id="sarConfigLoadBtn" class="sidebar-section button" style="flex: 1;">불러오기</button>
+                <button id="sarConfigDeleteBtn" class="sidebar-section button" style="flex: 1;">삭제</button>
+              </div>
+            </div>
+
             <label>
               설정 이름:
               <input type="text" id="sarConfigName" placeholder="설정 이름을 입력하세요" style="width: 100%;">
@@ -254,17 +266,6 @@
 
             <div style="margin-top: 20px;">
               <button id="sarConfigSaveBtn" class="sidebar-section button" style="width: 100%;">설정 저장</button>
-            </div>
-
-            <div style="margin-top: 15px;">
-              <h4>저장된 설정 목록</h4>
-              <select id="sarConfigList" style="width: 100%; margin-bottom: 10px;" size="5">
-                <!-- 저장된 설정 목록이 동적으로 표시됨 -->
-              </select>
-              <div style="display: flex; gap: 5px;">
-                <button id="sarConfigLoadBtn" class="sidebar-section button" style="flex: 1;">불러오기</button>
-                <button id="sarConfigDeleteBtn" class="sidebar-section button" style="flex: 1;">삭제</button>
-              </div>
             </div>
           </div>
         </div>

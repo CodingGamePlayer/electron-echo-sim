@@ -1,4 +1,4 @@
-// SAR 설정 타입 (로컬에서만 사용)
+// SAR 설정 타입
 interface SarSystemConfig {
   fc: number;
   bw: number;
@@ -22,6 +22,30 @@ interface SarSystemConfig {
   beam_id: string;
 }
 
+interface SarConfigDetail extends SarSystemConfig {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SarConfigItem {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SarConfigListResponse {
+  configs: SarConfigItem[];
+  total: number;
+}
+
+// Backend API 기본 URL
+const API_BASE_URL = 'http://localhost:8000/api';
+
 /**
  * SAR 시스템 설정 UI 관리
  */
@@ -41,25 +65,129 @@ export class SarConfigUIManager {
     const saveBtn = document.getElementById('sarConfigSaveBtn') as HTMLButtonElement;
     const loadBtn = document.getElementById('sarConfigLoadBtn') as HTMLButtonElement;
     const deleteBtn = document.getElementById('sarConfigDeleteBtn') as HTMLButtonElement;
+    const newBtn = document.getElementById('sarConfigNewBtn') as HTMLButtonElement;
     const configList = document.getElementById('sarConfigList') as HTMLSelectElement;
 
-    if (!saveBtn || !loadBtn || !deleteBtn || !configList) {
+    if (!saveBtn || !loadBtn || !deleteBtn || !newBtn || !configList) {
       return;
     }
 
+    newBtn.addEventListener('click', () => {
+      this.clearSarConfigForm();
+      const nameInput = document.getElementById('sarConfigName') as HTMLInputElement;
+      if (nameInput) {
+        nameInput.value = '';
+      }
+      if (configList) {
+        configList.selectedIndex = -1;
+      }
+    });
+
     saveBtn.addEventListener('click', async () => {
-      alert('데이터베이스 기능이 비활성화되어 있습니다.');
-      return;
+      try {
+        const nameInput = document.getElementById('sarConfigName') as HTMLInputElement;
+        if (!nameInput || !nameInput.value.trim()) {
+          alert('설정 이름을 입력하세요.');
+          return;
+        }
+
+        const config = this.getSarConfigFromForm();
+        if (!config) {
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/config`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: nameInput.value.trim(),
+            description: '',
+            ...config
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: '서버 오류가 발생했습니다.' }));
+          throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        alert('설정이 저장되었습니다.');
+        nameInput.value = '';
+        this.clearSarConfigForm();
+        this.loadSarConfigList();
+      } catch (error: any) {
+        console.error('SAR 설정 저장 실패:', error);
+        alert('설정 저장 실패: ' + error.message);
+      }
     });
 
     loadBtn.addEventListener('click', async () => {
-      alert('데이터베이스 기능이 비활성화되어 있습니다.');
-      return;
+      try {
+        const selectedId = configList.value;
+        if (!selectedId) {
+          alert('불러올 설정을 선택하세요.');
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/config/${selectedId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: '서버 오류가 발생했습니다.' }));
+          throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        const record: SarConfigDetail = await response.json();
+        this.fillSarConfigForm(record);
+        
+        const nameInput = document.getElementById('sarConfigName') as HTMLInputElement;
+        if (nameInput) {
+          nameInput.value = record.name;
+        }
+
+        alert('설정을 불러왔습니다.');
+      } catch (error: any) {
+        console.error('SAR 설정 불러오기 실패:', error);
+        alert('설정 불러오기 실패: ' + error.message);
+      }
     });
 
     deleteBtn.addEventListener('click', async () => {
-      alert('데이터베이스 기능이 비활성화되어 있습니다.');
-      return;
+      try {
+        const selectedId = configList.value;
+        if (!selectedId) {
+          alert('삭제할 설정을 선택하세요.');
+          return;
+        }
+
+        if (!confirm('정말 이 설정을 삭제하시겠습니까?')) {
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/config/${selectedId}`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: '서버 오류가 발생했습니다.' }));
+          throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        alert('설정이 삭제되었습니다.');
+        this.loadSarConfigList();
+      } catch (error: any) {
+        console.error('SAR 설정 삭제 실패:', error);
+        alert('설정 삭제 실패: ' + error.message);
+      }
     });
   }
 
@@ -99,7 +227,7 @@ export class SarConfigUIManager {
   /**
    * 폼에 SAR 설정 채우기
    */
-  private fillSarConfigForm(record: SarSystemConfig): void {
+  private fillSarConfigForm(record: SarSystemConfig | SarConfigDetail): void {
     (document.getElementById('sarConfigFc') as HTMLInputElement).value = record.fc.toString();
     (document.getElementById('sarConfigBw') as HTMLInputElement).value = record.bw.toString();
     (document.getElementById('sarConfigFs') as HTMLInputElement).value = record.fs.toString();
@@ -157,6 +285,35 @@ export class SarConfigUIManager {
       return;
     }
 
-    configList.innerHTML = '<option>데이터베이스 기능이 비활성화되어 있습니다</option>';
+    try {
+      const response = await fetch(`${API_BASE_URL}/config`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: SarConfigListResponse = await response.json();
+      configList.innerHTML = '';
+
+      if (data.configs.length === 0) {
+        configList.innerHTML = '<option>저장된 설정이 없습니다</option>';
+        return;
+      }
+
+      data.configs.forEach(config => {
+        const option = document.createElement('option');
+        option.value = config.id;
+        option.textContent = `${config.name} (${new Date(config.created_at).toLocaleString('ko-KR')})`;
+        configList.appendChild(option);
+      });
+    } catch (error: any) {
+      console.error('SAR 설정 목록 로드 실패:', error);
+      configList.innerHTML = '<option>로드 실패: ' + error.message + '</option>';
+    }
   }
 }
