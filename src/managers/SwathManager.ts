@@ -81,7 +81,7 @@ export class SwathManager {
     const {
       nearRange = 200000,
       farRange = 800000,
-      swathWidth = 50000,
+      swathWidth = 400000,
       azimuthLength = 50000,
     } = swathParams;
 
@@ -169,7 +169,7 @@ export class SwathManager {
     const {
       nearRange = 200000,
       farRange = 800000,
-      swathWidth = 50000,
+      swathWidth = 400000,
       azimuthLength = 50000,
     } = swathParams;
 

@@ -11,7 +11,9 @@ export class UIManager {
   private tleInput: HTMLTextAreaElement | null;
   private useTLECheckbox: HTMLInputElement | null;
   private applyTLEButton: HTMLButtonElement | null;
-  private showSwathCheckbox: HTMLInputElement | null;
+  private realtimeTrackingToggle: HTMLButtonElement | null;
+  private realtimeTrackingControls: HTMLDivElement | null;
+  private isRealtimeTrackingActive: boolean;
 
   constructor(satelliteManager: SatelliteManager, entityManager: EntityManager) {
     this.satelliteManager = satelliteManager;
@@ -19,7 +21,9 @@ export class UIManager {
     this.tleInput = null;
     this.useTLECheckbox = null;
     this.applyTLEButton = null;
-    this.showSwathCheckbox = null;
+    this.realtimeTrackingToggle = null;
+    this.realtimeTrackingControls = null;
+    this.isRealtimeTrackingActive = false;
   }
 
   /**
@@ -29,7 +33,8 @@ export class UIManager {
     this.tleInput = document.getElementById('tleInput') as HTMLTextAreaElement;
     this.useTLECheckbox = document.getElementById('useTLE') as HTMLInputElement;
     this.applyTLEButton = document.getElementById('applyTLE') as HTMLButtonElement;
-    this.showSwathCheckbox = document.getElementById('showSwath') as HTMLInputElement;
+    this.realtimeTrackingToggle = document.getElementById('realtimeTrackingToggle') as HTMLButtonElement;
+    this.realtimeTrackingControls = document.getElementById('realtimeTrackingControls') as HTMLDivElement;
 
     if (this.tleInput) {
       this.tleInput.value = defaultTLE;
@@ -40,8 +45,8 @@ export class UIManager {
     }
 
     this.setupTLEHandlers();
-    this.setupSwathHandlers();
     this.setupSwathControlHandlers();
+    this.setupRealtimeTrackingButton();
     this.updateSwathInfo();
   }
 
@@ -140,62 +145,6 @@ export class UIManager {
     }
   }
 
-  /**
-   * SAR Swath 제어 이벤트 핸들러 설정
-   */
-  setupSwathHandlers(): void {
-    if (!this.showSwathCheckbox) {
-      return;
-    }
-
-    // Swath 표시 체크박스 - 실시간 추적 모드와 연동
-    this.showSwathCheckbox.addEventListener('change', () => {
-      const showSwath = this.showSwathCheckbox!.checked;
-      const swathMode = document.getElementById('swathMode') as HTMLSelectElement;
-      
-      if (showSwath) {
-        // 실시간 추적 모드로 시작
-        if (swathMode && swathMode.value === 'realtime_tracking') {
-          // 제어 패널의 설정값 사용
-          const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
-          const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
-          const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
-          const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
-          const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
-          const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
-          const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
-          const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
-
-          this.entityManager.startRealtimeSwathTracking(
-            {
-              nearRange: parseFloat(swathNearRange?.value || '200000'),
-              farRange: parseFloat(swathFarRange?.value || '800000'),
-              swathWidth: parseFloat(swathWidth?.value || '50000'),
-              azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
-            },
-            {
-              color: swathColor?.value || 'PURPLE',
-              alpha: parseFloat(swathAlpha?.value || '0.05'),
-              maxSwaths: parseInt(swathMaxCount?.value || '1000'),
-              updateInterval: parseInt(swathUpdateInterval?.value || '500'),
-            }
-          );
-        } else {
-          // 다른 모드일 때는 실시간 추적 모드로 전환
-          if (swathMode) {
-            swathMode.value = 'realtime_tracking';
-            const modeSpecificOptions = document.getElementById('modeSpecificOptions') as HTMLDivElement;
-            this.updateModeSpecificOptions('realtime_tracking', modeSpecificOptions);
-          }
-          // 실시간 추적 시작
-          this.entityManager.startRealtimeSwathTracking();
-        }
-      } else {
-        // 실시간 추적 중지
-        this.entityManager.stopRealtimeSwathTracking();
-      }
-    });
-  }
 
   /**
    * ✅ Swath 제어 패널 핸들러 설정
@@ -207,7 +156,6 @@ export class UIManager {
     const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
     const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
     const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
-    const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
     const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
     const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
     const swathHeadingOffset = document.getElementById('swathHeadingOffset') as HTMLInputElement;
@@ -229,66 +177,103 @@ export class UIManager {
       });
     }
 
-    // Heading 오프셋 변경 시 즉시 적용
+    // Heading 오프셋 변경 시 즉시 적용 및 미리보기 업데이트
     if (swathHeadingOffset) {
       swathHeadingOffset.addEventListener('change', () => {
         const offset = parseFloat(swathHeadingOffset.value || '0');
         this.entityManager.setHeadingOffset(offset);
         // 실시간 추적이 실행 중이면 재시작하여 변경사항 적용
         this.applyRealtimeTrackingOptionsIfActive();
+        this.updateSwathPreview();
       });
       swathHeadingOffset.addEventListener('input', () => {
         const offset = parseFloat(swathHeadingOffset.value || '0');
         this.entityManager.setHeadingOffset(offset);
         // 실시간 추적이 실행 중이면 재시작하여 변경사항 적용
         this.applyRealtimeTrackingOptionsIfActive();
+        this.updateSwathPreview();
       });
     }
 
-    // 옵션 변경 시 실시간 추적이 실행 중이면 즉시 적용
+    // 옵션 변경 시 실시간 추적이 실행 중이면 즉시 적용 및 미리보기 업데이트
     const optionInputs = [
-      swathColor, swathAlpha, swathMaxCount, swathNearRange, swathFarRange,
-      swathWidth, swathAzimuthLength, swathUpdateInterval
+      swathColor, swathAlpha, swathMaxCount, swathNearRange, swathWidth, swathAzimuthLength, swathUpdateInterval
     ];
 
     optionInputs.forEach(input => {
       if (input) {
         input.addEventListener('change', () => {
           this.applyRealtimeTrackingOptionsIfActive();
+          this.updateSwathPreview();
         });
         // 숫자 입력 필드는 input 이벤트도 감지
         if (input.type === 'number') {
           input.addEventListener('input', () => {
             this.applyRealtimeTrackingOptionsIfActive();
+            this.updateSwathPreview();
           });
         }
       }
     });
 
-    // 모드 변경 시 모드별 옵션 업데이트 및 체크박스 상태 동기화
+    // 모드 변경 시 모드별 옵션 업데이트 및 버튼/체크박스 표시 제어
     swathMode.addEventListener('change', () => {
       this.updateModeSpecificOptions(swathMode.value, modeSpecificOptions);
       
-      // 실시간 추적 모드가 아닐 때는 체크박스 해제
-      if (swathMode.value !== 'realtime_tracking' && this.showSwathCheckbox) {
-        if (this.showSwathCheckbox.checked) {
+      // 실시간 추적 모드일 때
+      if (swathMode.value === 'realtime_tracking') {
+        // 실시간 추적 컨트롤 표시
+        if (this.realtimeTrackingControls) {
+          this.realtimeTrackingControls.style.display = 'block';
+        }
+        
+        // 실시간 추적이 실행 중이면 중지
+        if (this.isRealtimeTrackingActive) {
           this.entityManager.stopRealtimeSwathTracking();
-          this.showSwathCheckbox.checked = false;
+          this.isRealtimeTrackingActive = false;
+          this.updateRealtimeTrackingButton();
+        }
+      } else {
+        // 다른 모드일 때는 실시간 추적 컨트롤 숨김
+        if (this.realtimeTrackingControls) {
+          this.realtimeTrackingControls.style.display = 'none';
+        }
+        
+        // 실시간 추적이 실행 중이면 중지
+        if (this.isRealtimeTrackingActive) {
+          this.entityManager.stopRealtimeSwathTracking();
+          this.isRealtimeTrackingActive = false;
         }
       }
+      
+      // 미리보기 업데이트
+      this.updateSwathPreview();
     });
+    
+    // 초기 모드에 따라 컨트롤 표시/숨김 설정
+    if (swathMode.value === 'realtime_tracking') {
+      if (this.realtimeTrackingControls) {
+        this.realtimeTrackingControls.style.display = 'block';
+      }
+    } else {
+      if (this.realtimeTrackingControls) {
+        this.realtimeTrackingControls.style.display = 'none';
+      }
+    }
     this.updateModeSpecificOptions(swathMode.value, modeSpecificOptions);
+    
+    // 초기 미리보기 표시
+    this.updateSwathPreview();
 
     // Swath 추가 버튼
     addSwathBtn.addEventListener('click', () => {
-      // 실시간 추적 모드일 때는 체크박스와 연동
+      // 미리보기 제거 (실제 Swath 추가 시)
+      this.entityManager.clearSwathPreview();
+      
+      // 실시간 추적 모드일 때는 시작 버튼 클릭과 동일하게 동작
       if (swathMode.value === 'realtime_tracking') {
-        if (this.showSwathCheckbox) {
-          if (!this.showSwathCheckbox.checked) {
-            // 체크박스가 꺼져있으면 켜기
-            this.showSwathCheckbox.checked = true;
-            this.showSwathCheckbox.dispatchEvent(new Event('change'));
-          }
+        if (!this.isRealtimeTrackingActive && this.realtimeTrackingToggle) {
+          this.realtimeTrackingToggle.click();
         }
       } else {
         // 다른 모드일 때는 직접 추가
@@ -301,12 +286,15 @@ export class UIManager {
           },
           {
             nearRange: parseFloat(swathNearRange?.value || '200000'),
-            farRange: parseFloat(swathFarRange?.value || '800000'),
-            swathWidth: parseFloat(swathWidth?.value || '50000'),
+              farRange: this.calculateFarRange(),
+            swathWidth: parseFloat(swathWidth?.value || '400000'),
             azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
           }
         );
         this.updateSwathInfo();
+        
+        // 미리보기 다시 표시
+        this.updateSwathPreview();
       }
     });
 
@@ -314,7 +302,7 @@ export class UIManager {
     if (clearAllSwathsBtn) {
       clearAllSwathsBtn.addEventListener('click', () => {
         // 실시간 추적이 실행 중인지 확인
-        const wasRealtimeTrackingActive = this.showSwathCheckbox?.checked && 
+        const wasRealtimeTrackingActive = this.isRealtimeTrackingActive && 
           swathMode.value === 'realtime_tracking';
         
         // 실시간 추적이 실행 중이었다면 중지
@@ -330,7 +318,6 @@ export class UIManager {
         if (wasRealtimeTrackingActive) {
           // 제어 패널의 설정값 사용
           const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
-          const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
           const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
           const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
           const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
@@ -341,8 +328,8 @@ export class UIManager {
           this.entityManager.startRealtimeSwathTracking(
             {
               nearRange: parseFloat(swathNearRange?.value || '200000'),
-              farRange: parseFloat(swathFarRange?.value || '800000'),
-              swathWidth: parseFloat(swathWidth?.value || '50000'),
+              farRange: this.calculateFarRange(),
+              swathWidth: parseFloat(swathWidth?.value || '400000'),
               azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
             },
             {
@@ -355,6 +342,8 @@ export class UIManager {
               updateInterval: parseInt(swathUpdateInterval?.value || '200'),
             }
           );
+          this.isRealtimeTrackingActive = true;
+          this.updateRealtimeTrackingButton();
         }
       });
     }
@@ -530,7 +519,7 @@ export class UIManager {
    * 실시간 추적이 실행 중일 때 옵션 변경 시 즉시 적용
    */
   private applyRealtimeTrackingOptionsIfActive(): void {
-    if (!this.showSwathCheckbox || !this.showSwathCheckbox.checked) {
+    if (!this.isRealtimeTrackingActive) {
       return;
     }
 
@@ -541,7 +530,6 @@ export class UIManager {
 
     // 실시간 추적이 실행 중이면 중지하고 새 옵션으로 재시작
     const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
-    const swathFarRange = document.getElementById('swathFarRange') as HTMLInputElement;
     const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
     const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
     const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
@@ -556,7 +544,7 @@ export class UIManager {
     this.entityManager.startRealtimeSwathTracking(
       {
         nearRange: parseFloat(swathNearRange?.value || '200000'),
-        farRange: parseFloat(swathFarRange?.value || '800000'),
+              farRange: this.calculateFarRange(),
         swathWidth: parseFloat(swathWidth?.value || '50000'),
         azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
       },
@@ -568,6 +556,100 @@ export class UIManager {
         showLabel: false,
         maxSwaths: parseInt(swathMaxCount?.value || '50'),
         updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+      }
+    );
+  }
+
+  /**
+   * 실시간 추적 버튼 설정
+   */
+  private setupRealtimeTrackingButton(): void {
+    if (!this.realtimeTrackingToggle) {
+      return;
+    }
+
+    this.realtimeTrackingToggle.addEventListener('click', () => {
+      if (this.isRealtimeTrackingActive) {
+        // 실시간 추적 중지
+        this.entityManager.stopRealtimeSwathTracking();
+        this.isRealtimeTrackingActive = false;
+      } else {
+        // 실시간 추적 시작
+          const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+          const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+          const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+          const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+          const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+          const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
+          const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
+
+          this.entityManager.startRealtimeSwathTracking(
+            {
+              nearRange: parseFloat(swathNearRange?.value || '200000'),
+              farRange: this.calculateFarRange(),
+              swathWidth: parseFloat(swathWidth?.value || '400000'),
+              azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+            },
+          {
+            color: swathColor?.value || 'PURPLE',
+            alpha: parseFloat(swathAlpha?.value || '0.05'),
+            maxSwaths: parseInt(swathMaxCount?.value || '1000'),
+            updateInterval: parseInt(swathUpdateInterval?.value || '200'),
+          }
+        );
+        this.isRealtimeTrackingActive = true;
+      }
+      
+      this.updateRealtimeTrackingButton();
+    });
+  }
+
+  /**
+   * 실시간 추적 버튼 상태 업데이트
+   */
+  private updateRealtimeTrackingButton(): void {
+    if (this.realtimeTrackingToggle) {
+      if (this.isRealtimeTrackingActive) {
+        this.realtimeTrackingToggle.textContent = '종료';
+        this.realtimeTrackingToggle.style.background = '#f44336';
+      } else {
+        this.realtimeTrackingToggle.textContent = '시작';
+        this.realtimeTrackingToggle.style.background = '#4CAF50';
+      }
+    }
+  }
+
+  /**
+   * Far Range 계산 (Near Range + Swath Width)
+   */
+  private calculateFarRange(): number {
+    const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+    const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+    const nearRange = parseFloat(swathNearRange?.value || '200000');
+    const swathWidthValue = parseFloat(swathWidth?.value || '400000');
+    return nearRange + swathWidthValue;
+  }
+
+  /**
+   * Swath 미리보기 업데이트
+   */
+  private updateSwathPreview(): void {
+    const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+    const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+    const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+    const swathColor = document.getElementById('swathColor') as HTMLSelectElement;
+    const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
+
+    this.entityManager.updateSwathPreview(
+      {
+        nearRange: parseFloat(swathNearRange?.value || '200000'),
+              farRange: this.calculateFarRange(),
+        swathWidth: parseFloat(swathWidth?.value || '50000'),
+        azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+      },
+      {
+        color: swathColor?.value || 'YELLOW',
+        alpha: parseFloat(swathAlpha?.value || '0.3'),
       }
     );
   }

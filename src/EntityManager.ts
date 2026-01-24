@@ -23,6 +23,15 @@ export class EntityManager {
   private realtimeSwathId: string | null;
   private headingOffset: number; // Swath 방향 조정을 위한 heading 오프셋 (도)
   private altitudeOffset: number; // 위성 고도 조정을 위한 고도 오프셋 (미터)
+  private previewSwathId: string | null; // 미리보기 Swath ID
+  private previewSwathParams: {
+    nearRange?: number;
+    farRange?: number;
+    swathWidth?: number;
+    azimuthLength?: number;
+  } | null; // 미리보기 파라미터 저장
+  private previewSwathOptions: Partial<any> | undefined; // 미리보기 옵션 저장
+  private lastPreviewUpdateTime: number; // 마지막 미리보기 업데이트 시간
 
   constructor(viewer: any, satelliteManager: SatelliteManager) {
     this.viewer = viewer;
@@ -40,6 +49,10 @@ export class EntityManager {
     this.realtimeSwathId = null;
     this.headingOffset = 0; // 기본값: 오프셋 없음
     this.altitudeOffset = 0; // 기본값: 오프셋 없음
+    this.previewSwathId = null; // 미리보기 Swath ID 초기화
+    this.previewSwathParams = null; // 미리보기 파라미터 초기화
+    this.previewSwathOptions = undefined; // 미리보기 옵션 초기화
+    this.lastPreviewUpdateTime = 0; // 마지막 업데이트 시간 초기화
   }
 
   /**
@@ -138,6 +151,13 @@ export class EntityManager {
           
           // 위치 업데이트
           this.position.setValue(this.currentCartesian);
+
+          // 미리보기가 활성화되어 있으면 위치에 따라 업데이트 (최대 1초에 한 번)
+          const now = Date.now();
+          if (this.previewSwathId && this.previewSwathParams && (now - this.lastPreviewUpdateTime) > 1000) {
+            this.updateSwathPreview(this.previewSwathParams, this.previewSwathOptions || undefined);
+            this.lastPreviewUpdateTime = now;
+          }
 
           // SwathManager가 실시간 추적을 처리하므로 여기서는 제거
         }
@@ -581,7 +601,7 @@ export class EntityManager {
    * 위성의 현재 위치와 속도 벡터를 기반으로 Swath 계산
    */
   updateSwathFromSatellitePosition(
-    swathWidth: number = 50000,      // 50km
+    swathWidth: number = 400000,      // 400km
     nearRange: number = 200000,      // 200km
     farRange: number = 800000,       // 800km
     azimuthLength: number = 50000    // 50km (더 크게 표시)
@@ -790,5 +810,97 @@ export class EntityManager {
    */
   getAltitudeOffset(): number {
     return this.altitudeOffset;
+  }
+
+  /**
+   * ✅ Swath 미리보기 업데이트 (현재 설정으로 미리보기 표시)
+   */
+  updateSwathPreview(
+    swathParams: {
+      nearRange?: number;
+      farRange?: number;
+      swathWidth?: number;
+      azimuthLength?: number;
+    } = {},
+    options?: Partial<any>
+  ): void {
+    // 파라미터 저장 (위성 위치 변경 시 재사용)
+    this.previewSwathParams = swathParams;
+    this.previewSwathOptions = options;
+
+    // 기존 미리보기 제거
+    this.clearSwathPreview();
+
+    // 현재 위성 위치 가져오기
+    const currentPosition = this.getCurrentSatellitePosition();
+    if (!currentPosition) {
+      console.warn('[EntityManager] 미리보기 생성 실패: 위성 위치를 가져올 수 없습니다.');
+      return;
+    }
+
+    // 기본 파라미터
+    const {
+      nearRange = 200000,
+      farRange = 800000,
+      swathWidth = 400000,
+      azimuthLength = 50000,
+    } = swathParams;
+
+    // 미리보기용 기하 파라미터 생성
+    const geometry: SARSwathGeometry = {
+      centerLat: currentPosition.latitude,
+      centerLon: currentPosition.longitude,
+      heading: currentPosition.heading,
+      nearRange,
+      farRange,
+      swathWidth,
+      azimuthLength,
+      satelliteAltitude: currentPosition.altitude,
+    };
+
+    // 미리보기 옵션 (실제 Swath와 구분되도록 다른 스타일)
+    const previewOptions = {
+      color: options?.color || 'YELLOW',
+      alpha: options?.alpha || 0.3, // 미리보기는 더 진하게
+      outlineColor: 'YELLOW',
+      outlineWidth: 3, // 두꺼운 테두리
+      showLabel: false,
+      mode: SwathMode.STATIC,
+    };
+
+    // 미리보기 Swath 생성
+    this.previewSwathId = this.swathManager.addStaticSwath(geometry, previewOptions);
+    
+    // 미리보기 Swath에 점선 스타일 적용
+    if (this.previewSwathId) {
+      // SwathManager의 getAllSwaths를 통해 접근
+      const allSwaths = this.swathManager.getAllSwaths();
+      const swathInstance = allSwaths.find(s => s.id === this.previewSwathId);
+      if (swathInstance && swathInstance.entity) {
+        // 점선 테두리 추가
+        swathInstance.entity.polygon.outline = true;
+        swathInstance.entity.polygon.outlineColor = Cesium.Color.YELLOW.withAlpha(0.8);
+        swathInstance.entity.polygon.outlineWidth = 3;
+        // 미리보기임을 표시하기 위해 material 변경
+        swathInstance.entity.polygon.material = Cesium.Color.YELLOW.withAlpha(0.2);
+      }
+    }
+
+    this.lastPreviewUpdateTime = Date.now();
+    console.log('[EntityManager] Swath 미리보기 업데이트:', this.previewSwathId);
+  }
+
+  /**
+   * ✅ Swath 미리보기 제거
+   */
+  clearSwathPreview(): void {
+    if (this.previewSwathId) {
+      this.swathManager.removeSwath(this.previewSwathId);
+      this.previewSwathId = null;
+      // 파라미터는 유지 (옵션 변경 시 재사용)
+      // this.previewSwathParams = null;
+      // this.previewSwathOptions = null;
+      console.log('[EntityManager] Swath 미리보기 제거');
+    }
   }
 }

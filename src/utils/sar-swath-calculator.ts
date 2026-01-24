@@ -19,7 +19,11 @@ export class SARSwathCalculator {
    * @returns 4개의 코너 좌표 (경도, 위도)
    */
   static calculateSwathCorners(geometry: SARSwathGeometry): SwathCorners {
-    const { centerLat, centerLon, heading, nearRange, farRange, azimuthLength } = geometry;
+    const { centerLat, centerLon, heading, nearRange, farRange, swathWidth, azimuthLength } = geometry;
+    
+    // farRange가 우선순위가 높음. farRange가 없으면 swathWidth로 계산
+    // swathWidth가 제공되면 farRange를 재계산 (swathWidth = farRange - nearRange)
+    const effectiveFarRange = farRange || (nearRange + (swathWidth || 0));
 
     // Heading을 라디안으로 변환
     const headingRad = Cesium.Math.toRadians(heading);
@@ -33,7 +37,7 @@ export class SARSwathCalculator {
 
     // Ground range를 각도 오프셋으로 변환
     const nearRangeRad = this.groundRangeToAngularOffset(nearRange, earthRadius);
-    const farRangeRad = this.groundRangeToAngularOffset(farRange, earthRadius);
+    const farRangeRad = this.groundRangeToAngularOffset(effectiveFarRange, earthRadius);
     const azimuthHalfRad = this.groundRangeToAngularOffset(azimuthLength / 2, earthRadius);
 
     // 중심 위치를 라디안으로 변환
