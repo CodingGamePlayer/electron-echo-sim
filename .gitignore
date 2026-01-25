@@ -3,6 +3,7 @@ dist
 .nv
 *.zip
 *.png
+python-3.14.2-embed-amd64
 
 # Python
 __pycache__/
