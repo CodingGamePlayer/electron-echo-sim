@@ -123,8 +123,8 @@ class RDAProcessor:
             pulse_compressed = pulse_compressed[:, mid_range_index-range_window:mid_range_index+range_window]
             r1 = r[mid_range_index-range_window:mid_range_index+range_window]
         
-        # 4. Range-Doppler Map 생성
-        rd = self.range_doppler_map(pulse_compressed)
+        # 4. Range-Doppler Map 생성 (echo_sim_cmd 방식: r1을 전달하여 r_max 계산)
+        rd = self.range_doppler_map(pulse_compressed, r1=r1)
         
         # 5. RCMC (Range Cell Migration Correction)
         rd = self.rcmc(rd, r1)
@@ -219,7 +219,7 @@ class RDAProcessor:
         
         return pulse_compressed
     
-    def range_doppler_map(self, pulse_compressed: np.ndarray) -> np.ndarray:
+    def range_doppler_map(self, pulse_compressed: np.ndarray, r1: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Range-Doppler Map 생성
         
@@ -227,6 +227,8 @@ class RDAProcessor:
         -----------
         pulse_compressed : np.ndarray
             압축된 신호 (shape: [num_pulses, num_range_samples])
+        r1 : np.ndarray, optional
+            Range 배열 (m). None인 경우 자동 계산 (echo_sim_cmd와의 호환성을 위해)
         
         Returns:
         --------
@@ -238,8 +240,14 @@ class RDAProcessor:
         # Swath width 계산
         swath_width = LIGHT_SPEED * (self.swl - self.taup) / 2.0
         
-        # Azimuth 참조 길이 계산
-        r_max = LIGHT_SPEED * self.swst / 2.0 + num_range_samples * self.dr
+        # Azimuth 참조 길이 계산 (echo_sim_cmd 방식: r_max = np.max(r1))
+        if r1 is not None:
+            # echo_sim_cmd 방식: 실제 사용되는 r1의 최대값 사용
+            r_max = np.max(r1)
+        else:
+            # 기존 방식 (호환성 유지)
+            r_max = LIGHT_SPEED * self.swst / 2.0 + num_range_samples * self.dr
+        
         SAL = r_max * np.sin(self.beamwidth_az)
         SAT = SAL / self.V
         az_ref_length = int(SAT * self.prf)

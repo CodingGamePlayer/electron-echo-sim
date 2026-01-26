@@ -25,29 +25,121 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 def visualize_chirp_signal(chirp_signal, config, output_path):
     """Chirp 신호 시각화"""
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    fig, axes = plt.subplots(6, 1, figsize=(14, 18))
     
-    # 시간 벡터 생성
+    # 시간 벡터 생성 (중심이 0이 되도록)
     dt = 1.0 / config.fs
-    t = np.arange(len(chirp_signal)) * dt * 1e6  # 마이크로초 단위
+    n = len(chirp_signal)
+    t = (np.arange(n) - n / 2) * dt  # 중심이 0인 시간 벡터
+    t_us = t * 1e6  # 마이크로초 단위
     
-    # 1. 시간 영역 - 실수부와 허수부
-    axes[0].plot(t, chirp_signal.real, label='Real', alpha=0.7)
-    axes[0].plot(t, chirp_signal.imag, label='Imaginary', alpha=0.7)
+    # Chirp rate 및 순시 주파수 계산
+    chirp_rate = config.bw / config.taup
+    instantaneous_freq = chirp_rate * t  # 순시 주파수: f(t) = Kr * t
+    
+    # 1. 시간 영역 - 실수부만 표시 (하나의 그래프, echo_sim_cmd 방식)
+    # echo_sim_cmd/chirp.py처럼 반송파 주파수를 포함한 신호로 변환하여 파동 간격 변화를 명확히 시각화
+    # echo_sim_cmd: phi = 2π*(fc*t + (k/2)*t²), s_t = cos(phi)
+    # backend: baseband signal exp(j*π*Kr*t²), real part = cos(π*Kr*t²)
+    # 반송파 주파수를 포함한 신호로 변환: cos(2π*fc*t + π*Kr*t²)
+    phi_with_carrier = 2 * np.pi * (config.fc * t + (chirp_rate / 2) * t ** 2)
+    chirp_with_carrier = np.cos(phi_with_carrier)
+    
+    axes[0].plot(t_us, chirp_with_carrier, color='blue', linewidth=1.5)
     axes[0].set_xlabel('Time (μs)')
     axes[0].set_ylabel('Amplitude')
-    axes[0].set_title('Chirp Signal - Time Domain (I/Q)')
-    axes[0].legend()
+    axes[0].set_title('Chirp Signal - Time Domain (With Carrier Frequency, echo_sim_cmd style)')
     axes[0].grid(True, alpha=0.3)
+    axes[0].axvline(x=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    axes[0].axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    # 파동 간격 변화 설명
+    axes[0].text(0.02, 0.98, f'With carrier freq (fc={config.fc/1e9:.2f} GHz)\nWave spacing: Wide → Medium → Narrow', 
+                 transform=axes[0].transAxes, verticalalignment='top', fontsize=9,
+                 bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.7))
     
-    # 2. 시간 영역 - 크기 (Magnitude)
-    axes[1].plot(t, np.abs(chirp_signal), 'g-', linewidth=1.5)
+    # 2. 순시 주파수 변화 (baseband 및 carrier 포함)
+    # Baseband 순시 주파수: f_baseband(t) = Kr × t
+    # Carrier 포함 순시 주파수: f_with_carrier(t) = fc + Kr × t
+    inst_freq_with_carrier = config.fc + instantaneous_freq
+    
+    axes[1].plot(t_us, instantaneous_freq / 1e6, 'g-', linewidth=2, label='Baseband: f(t) = Kr × t', alpha=0.7)
+    axes[1].plot(t_us, inst_freq_with_carrier / 1e6, 'b-', linewidth=2, label=f'With Carrier: f(t) = fc + Kr × t (fc={config.fc/1e9:.2f} GHz)', alpha=0.7)
     axes[1].set_xlabel('Time (μs)')
-    axes[1].set_ylabel('Magnitude')
-    axes[1].set_title('Chirp Signal - Magnitude')
+    axes[1].set_ylabel('Frequency (MHz)')
+    axes[1].set_title('Instantaneous Frequency (Baseband vs With Carrier)')
     axes[1].grid(True, alpha=0.3)
+    axes[1].axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    axes[1].axvline(x=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    # 주파수 범위 표시
+    axes[1].axhline(y=-config.bw/2/1e6, color='orange', linestyle=':', alpha=0.7, label=f'BW/2 = ±{config.bw/2/1e6:.2f} MHz')
+    axes[1].axhline(y=config.bw/2/1e6, color='orange', linestyle=':', alpha=0.7)
+    axes[1].legend(fontsize=8)
     
-    # 3. 주파수 영역 (FFT)
+    # 3. 파동 간격 변화 확대 뷰 (초기/중간/후반 구간)
+    # echo_sim_cmd/chirp.py 방식: 반송파 주파수를 포함한 신호로 파동 간격 변화를 명확히 시각화
+    # 초기: 넓은 파동 간격 (낮은 주파수, -taup/2 ~ -taup/4)
+    # 중간: 중간 파동 간격 (중간 주파수, -taup/8 ~ taup/8)
+    # 후반: 좁은 파동 간격 (높은 주파수, taup/4 ~ taup/2)
+    zoom_regions = [
+        {'name': 'Early (Wide Spacing, Low Freq)', 'start': -config.taup/2, 'end': -config.taup/4, 'color': 'blue'},
+        {'name': 'Middle (Medium Spacing, Mid Freq)', 'start': -config.taup/8, 'end': config.taup/8, 'color': 'green'},
+        {'name': 'Late (Narrow Spacing, High Freq)', 'start': config.taup/4, 'end': config.taup/2, 'color': 'red'}
+    ]
+    
+    for i, region in enumerate(zoom_regions):
+        start_idx = np.argmin(np.abs(t - region['start']))
+        end_idx = np.argmin(np.abs(t - region['end']))
+        if end_idx <= start_idx:
+            end_idx = start_idx + 1
+        
+        t_zoom = t_us[start_idx:end_idx]
+        # 반송파 주파수를 포함한 신호 사용 (echo_sim_cmd 방식)
+        chirp_zoom_with_carrier = chirp_with_carrier[start_idx:end_idx]
+        
+        axes[2].plot(t_zoom, chirp_zoom_with_carrier, label=region['name'], 
+                    color=region['color'], alpha=0.8, linewidth=2.0)
+    
+    axes[2].set_xlabel('Time (μs)')
+    axes[2].set_ylabel('Amplitude')
+    axes[2].set_title('Waveform Spacing Change: Wide (Early) → Medium (Middle) → Narrow (Late)')
+    axes[2].legend(fontsize=9, loc='best')
+    axes[2].grid(True, alpha=0.3)
+    axes[2].axhline(y=0, color='gray', linestyle='--', alpha=0.3, linewidth=0.5)
+    # 파동 간격 변화 설명
+    axes[2].text(0.02, 0.98, 'With carrier frequency (echo_sim_cmd style)\nFrequency increases → Wave spacing decreases', 
+                 transform=axes[2].transAxes, verticalalignment='top', fontsize=9,
+                 bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.7))
+    
+    # 4. 시간 영역 - 크기 (Magnitude)
+    # 크기: |z(t)| = sqrt(Real² + Imaginary²)
+    magnitude = np.abs(chirp_signal)
+    axes[3].plot(t_us, magnitude, 'g-', linewidth=1.5, label='Magnitude |z(t)|')
+    axes[3].set_xlabel('Time (μs)')
+    axes[3].set_ylabel('Magnitude')
+    axes[3].set_title('Chirp Signal - Magnitude (|z(t)| = sqrt(Real² + Imaginary²))')
+    axes[3].grid(True, alpha=0.3)
+    axes[3].axvline(x=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    axes[3].legend()
+    
+    # 5. 시간 영역 - 위상 (Phase)
+    # 위상: phase(t) = atan2(Imaginary, Real)
+    phase = np.angle(chirp_signal)
+    axes[4].plot(t_us, phase, 'm-', linewidth=1.5, label='Phase φ(t)')
+    axes[4].set_xlabel('Time (μs)')
+    axes[4].set_ylabel('Phase (rad)')
+    axes[4].set_title('Chirp Signal - Phase (φ(t) = atan2(Imaginary, Real))')
+    axes[4].grid(True, alpha=0.3)
+    axes[4].axvline(x=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    axes[4].axhline(y=0, color='gray', linestyle='--', alpha=0.5, linewidth=1)
+    axes[4].legend()
+    # 위상 범위 표시
+    phase_min_deg = np.min(phase) * 180 / np.pi
+    phase_max_deg = np.max(phase) * 180 / np.pi
+    axes[4].text(0.02, 0.98, f'Phase range: {np.min(phase):.2f} ~ {np.max(phase):.2f} rad\n({phase_min_deg:.1f}° ~ {phase_max_deg:.1f}°)', 
+                 transform=axes[4].transAxes, verticalalignment='top', fontsize=9,
+                 bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.7))
+    
+    # 6. 주파수 영역 (FFT)
     fft_signal = np.fft.fft(chirp_signal)
     fft_freq = np.fft.fftfreq(len(chirp_signal), dt) / 1e6  # MHz 단위
     fft_magnitude = np.abs(fft_signal)
@@ -57,23 +149,24 @@ def visualize_chirp_signal(chirp_signal, config, output_path):
     positive_freq = fft_freq[positive_freq_idx]
     positive_magnitude = fft_magnitude[positive_freq_idx]
     
-    axes[2].plot(positive_freq, positive_magnitude, 'r-', linewidth=1.5)
-    axes[2].set_xlabel('Frequency (MHz)')
-    axes[2].set_ylabel('Magnitude')
-    axes[2].set_title('Chirp Signal - Frequency Domain (FFT)')
-    axes[2].grid(True, alpha=0.3)
-    axes[2].set_xlim([0, config.fs / 2 / 1e6])  # 나이키스트 주파수까지
+    axes[5].plot(positive_freq, positive_magnitude, 'r-', linewidth=1.5)
+    axes[5].set_xlabel('Frequency (MHz)')
+    axes[5].set_ylabel('Magnitude')
+    axes[5].set_title('Chirp Signal - Frequency Domain (FFT)')
+    axes[5].grid(True, alpha=0.3)
+    axes[5].set_xlim([0, config.fs / 2 / 1e6])  # 나이키스트 주파수까지
     
     # 대역폭 범위 표시
-    axes[2].axvline(config.bw / 2 / 1e6, color='g', linestyle='--', alpha=0.5, label=f'BW/2 = {config.bw/2/1e6:.2f} MHz')
-    axes[2].legend()
+    axes[5].axvline(config.bw / 2 / 1e6, color='g', linestyle='--', alpha=0.5, label=f'BW/2 = {config.bw/2/1e6:.2f} MHz')
+    axes[5].legend()
     
     # 대역폭 내 에너지 비율 표시
     bw_mask = np.abs(positive_freq) <= config.bw / 2 / 1e6
-    bw_energy_ratio = np.sum(positive_magnitude[bw_mask]) / np.sum(positive_magnitude) * 100
-    axes[2].text(0.02, 0.98, f'Energy in BW: {bw_energy_ratio:.2f}%', 
-                 transform=axes[2].transAxes, verticalalignment='top',
-                 bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    if np.sum(bw_mask) > 0:
+        bw_energy_ratio = np.sum(positive_magnitude[bw_mask]) / np.sum(positive_magnitude) * 100
+        axes[5].text(0.02, 0.98, f'Energy in BW: {bw_energy_ratio:.2f}%', 
+                     transform=axes[5].transAxes, verticalalignment='top',
+                     bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')

@@ -64,5 +64,20 @@ class SarConfigModel(Base):
     el_angle = Column(Float, nullable=True, default=0.0)  # Elevation angle (deg) - rank 계산에 사용
     az_angle = Column(Float, nullable=True, default=0.0)  # Azimuth angle (deg) - rank 계산에 사용
     
+    # SSP 파일 추가 파라미터
+    chirp_set_size = Column(Integer, nullable=True, default=200)  # Chirp 세트 크기
+    echo_generator = Column(String, nullable=True, default="EchoGenerator_chirped")  # Echo 생성기 타입
+    num_pulses = Column(Integer, nullable=True)  # 펄스 개수
+    pulse_num = Column(Integer, nullable=True, default=0)  # 펄스 번호
+    begin_time = Column(DateTime, nullable=True)  # 시작 시간
+    bus_roll_angle = Column(Float, nullable=True, default=0.0)  # 버스 롤 각도 (deg)
+    bus_pitch_angle = Column(Float, nullable=True, default=0.0)  # 버스 피치 각도 (deg)
+    bus_yaw_angle = Column(Float, nullable=True, default=0.0)  # 버스 요 각도 (deg)
+    bus_roll_rate = Column(Float, nullable=True, default=0.0)  # 버스 롤 각속도 (deg/s)
+    bus_pitch_rate = Column(Float, nullable=True, default=0.0)  # 버스 피치 각속도 (deg/s)
+    bus_yaw_rate = Column(Float, nullable=True, default=0.0)  # 버스 요 각속도 (deg/s)
+    mode = Column(String, nullable=True)  # SAR 모드 (STRIPMAP, SCANSAR 등)
+    num_repeats = Column(Integer, nullable=True, default=1)  # 반복 횟수
+    
     def __repr__(self):
         return f"<SarConfigModel(id={self.id}, name={self.name})>"
