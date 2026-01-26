@@ -2,6 +2,8 @@ node_modules
 dist
 .nv
 *.zip
+echo_sim_cmd_2026_0109_정해찬
+tiles
 
 # Python
 __pycache__/
