@@ -483,31 +483,41 @@ html, body, #cesiumContainer {
 
 /* 스크롤바 스타일 - 어두운 테마 */
 #sidebarContent::-webkit-scrollbar,
-.tab-content::-webkit-scrollbar {
+.tab-content::-webkit-scrollbar,
+#signalResultsContent::-webkit-scrollbar,
+#swathGroupsContent::-webkit-scrollbar {
   width: 10px;
 }
 
 #sidebarContent::-webkit-scrollbar-track,
-.tab-content::-webkit-scrollbar-track {
+.tab-content::-webkit-scrollbar-track,
+#signalResultsContent::-webkit-scrollbar-track,
+#swathGroupsContent::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.3);
   border-radius: 5px;
 }
 
 #sidebarContent::-webkit-scrollbar-thumb,
-.tab-content::-webkit-scrollbar-thumb {
+.tab-content::-webkit-scrollbar-thumb,
+#signalResultsContent::-webkit-scrollbar-thumb,
+#swathGroupsContent::-webkit-scrollbar-thumb {
   background: rgba(76, 175, 80, 0.5);
   border-radius: 5px;
   border: 2px solid rgba(0, 0, 0, 0.2);
 }
 
 #sidebarContent::-webkit-scrollbar-thumb:hover,
-.tab-content::-webkit-scrollbar-thumb:hover {
+.tab-content::-webkit-scrollbar-thumb:hover,
+#signalResultsContent::-webkit-scrollbar-thumb:hover,
+#swathGroupsContent::-webkit-scrollbar-thumb:hover {
   background: rgba(76, 175, 80, 0.7);
   border-color: rgba(0, 0, 0, 0.3);
 }
 
 #sidebarContent::-webkit-scrollbar-thumb:active,
-.tab-content::-webkit-scrollbar-thumb:active {
+.tab-content::-webkit-scrollbar-thumb:active,
+#signalResultsContent::-webkit-scrollbar-thumb:active,
+#swathGroupsContent::-webkit-scrollbar-thumb:active {
   background: rgba(76, 175, 80, 0.9);
 }
 

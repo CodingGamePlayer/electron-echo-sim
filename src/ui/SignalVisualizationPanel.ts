@@ -401,16 +401,30 @@ export class SignalVisualizationPanel {
         const ctx = this.chirpCanvas!.getContext('2d');
         if (!ctx) return;
 
-        // Canvas 실제 크기 가져오기 (CSS 크기에 맞춤)
-        const rect = this.chirpCanvas!.getBoundingClientRect();
-        let width = Math.floor(rect.width);
-        let height = Math.floor(rect.height * 0.75);
+        // 사이드바 컨텐츠 영역의 실제 너비를 기준으로 캔버스 크기 계산
+        // 초기 비율 유지: 370:400 (width:height)
+        const contentArea = document.getElementById('signalResultsContent');
+        let width = 370; // 기본값
+        let height = 400; // 기본값
         
-        // 사이드바가 아직 열리지 않았거나 크기가 0이면 기본값 사용
-        if (width === 0 || height === 0) {
-          width = 370;
-          height = 300;
+        if (contentArea) {
+          const contentRect = contentArea.getBoundingClientRect();
+          // 패딩 15px * 2 = 30px 제외
+          width = Math.floor(contentRect.width - 30);
+          // 초기 비율 유지 (370:400 = 0.925)
+          height = Math.floor(width * (400 / 370));
+        } else {
+          // 사이드바가 아직 열리지 않았거나 컨텐츠 영역을 찾을 수 없으면 기본값 사용
+          const rect = this.chirpCanvas!.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            width = Math.floor(rect.width);
+            height = Math.floor(width * (400 / 370)); // 비율 유지
+          }
         }
+        
+        // 최소 크기 보장
+        if (width < 200) width = 370;
+        if (height < 200) height = 400;
       
       this.chirpCanvas!.width = width;
       this.chirpCanvas!.height = height;
@@ -631,16 +645,30 @@ export class SignalVisualizationPanel {
         const ctx = this.echoCanvas!.getContext('2d');
         if (!ctx) return;
 
-        // Canvas 실제 크기 가져오기 (CSS 크기에 맞춤)
-        const rect = this.echoCanvas!.getBoundingClientRect();
-        let width = Math.floor(rect.width);
-        let height = Math.floor(rect.height * 0.75);
+        // 사이드바 컨텐츠 영역의 실제 너비를 기준으로 캔버스 크기 계산
+        // 초기 비율 유지: 370:350 (width:height)
+        const contentArea = document.getElementById('signalResultsContent');
+        let width = 370; // 기본값
+        let height = 350; // 기본값
         
-        // 사이드바가 아직 열리지 않았거나 크기가 0이면 기본값 사용
-        if (width === 0 || height === 0) {
-          width = 370;
-          height = 250;
+        if (contentArea) {
+          const contentRect = contentArea.getBoundingClientRect();
+          // 패딩 15px * 2 = 30px 제외
+          width = Math.floor(contentRect.width - 30);
+          // 초기 비율 유지 (370:350 = 약 1.057)
+          height = Math.floor(width * (350 / 370));
+        } else {
+          // 사이드바가 아직 열리지 않았거나 컨텐츠 영역을 찾을 수 없으면 기본값 사용
+          const rect = this.echoCanvas!.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            width = Math.floor(rect.width);
+            height = Math.floor(width * (350 / 370)); // 비율 유지
+          }
         }
+        
+        // 최소 크기 보장
+        if (width < 200) width = 370;
+        if (height < 200) height = 350;
       
       this.echoCanvas!.width = width;
       this.echoCanvas!.height = height;
