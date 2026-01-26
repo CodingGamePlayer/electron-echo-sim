@@ -1,4 +1,5 @@
 import { SatelliteManager } from '../satellite/SatelliteManager.js';
+import { SatelliteEntityManager } from './SatelliteEntityManager.js';
 
 /**
  * 예상 경로 관리
@@ -6,16 +7,18 @@ import { SatelliteManager } from '../satellite/SatelliteManager.js';
 export class PredictedPathManager {
   private viewer: any;
   private satelliteManager: SatelliteManager;
+  private satelliteEntityManager: SatelliteEntityManager | null;
   private predictedPathEntity: any;
 
-  constructor(viewer: any, satelliteManager: SatelliteManager) {
+  constructor(viewer: any, satelliteManager: SatelliteManager, satelliteEntityManager?: SatelliteEntityManager) {
     this.viewer = viewer;
     this.satelliteManager = satelliteManager;
+    this.satelliteEntityManager = satelliteEntityManager || null;
     this.predictedPathEntity = null;
   }
 
   /**
-   * 예상 경로 그리기
+   * 예상 경로 그리기 (과거 30분 + 미래 30분)
    */
   drawPredictedPath(hours: number = 4): void {
     if (!this.satelliteManager.useTLE) {
@@ -26,14 +29,40 @@ export class PredictedPathManager {
       this.viewer.entities.remove(this.predictedPathEntity);
     }
 
-    const startTime = this.viewer.clock.currentTime;
+    const currentTime = this.viewer.clock.currentTime;
     const sampleInterval = 5;
-    const numSamples = Math.floor((hours * 60) / sampleInterval);
-    const positions: any[] = [];
+    
+    // 과거 1시간과 미래 1시간 (총 2시간)
+    const pastMinutes = 60;
+    const futureMinutes = 60;
+    const pastSamples = Math.floor(pastMinutes / sampleInterval);
+    const futureSamples = Math.floor(futureMinutes / sampleInterval);
 
-    for (let i = 0; i <= numSamples; i++) {
+    // 과거 위치들을 계산 (고정된 위치)
+    const pastPositions: any[] = [];
+    for (let i = pastSamples; i >= 1; i--) {
       const sampleTime = Cesium.JulianDate.addMinutes(
-        startTime,
+        currentTime,
+        -i * sampleInterval,
+        new Cesium.JulianDate()
+      );
+      
+      const position = this.satelliteManager.calculatePosition(sampleTime);
+      if (position) {
+        const cartesian = Cesium.Cartesian3.fromDegrees(
+          position.longitude,
+          position.latitude,
+          position.altitude
+        );
+        pastPositions.push(cartesian);
+      }
+    }
+
+    // 미래 위치들을 계산 (고정된 위치)
+    const futurePositions: any[] = [];
+    for (let i = 1; i <= futureSamples; i++) {
+      const sampleTime = Cesium.JulianDate.addMinutes(
+        currentTime,
         i * sampleInterval,
         new Cesium.JulianDate()
       );
@@ -45,26 +74,80 @@ export class PredictedPathManager {
           position.latitude,
           position.altitude
         );
-        positions.push(cartesian);
+        futurePositions.push(cartesian);
       }
     }
 
-    if (positions.length > 0) {
-      this.predictedPathEntity = this.viewer.entities.add({
-        name: `예상 경로 (${hours}시간)`,
-        polyline: {
-          positions: positions,
-          width: 4,
-          material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.3,
-            color: Cesium.Color.ORANGE.withAlpha(0.7),
-          }),
-          clampToGround: false,
-          arcType: Cesium.ArcType.GEODESIC,
-          show: true,
-        },
-      });
-    }
+    // 전체 positions 배열을 CallbackProperty로 만들어서 중간 점(현재 위치)이 항상 위성의 현재 위치를 반영하도록 함
+    const positions = new Cesium.CallbackProperty(() => {
+      const positionsArray: any[] = [];
+
+      // 과거 위치들 추가
+      positionsArray.push(...pastPositions);
+
+      // 중간 점: 위성의 현재 실제 위치 (동적 업데이트)
+      if (this.satelliteEntityManager) {
+        const currentCartesian = this.satelliteEntityManager.getCurrentCartesian();
+        if (currentCartesian && currentCartesian.x !== undefined && currentCartesian.y !== undefined && currentCartesian.z !== undefined) {
+          if (!isNaN(currentCartesian.x) && !isNaN(currentCartesian.y) && !isNaN(currentCartesian.z)) {
+            positionsArray.push(currentCartesian.clone());
+          } else {
+            // 유효하지 않은 경우 TLE로 계산
+            const now = this.viewer.clock.currentTime;
+            const currentPosition = this.satelliteManager.calculatePosition(now);
+            if (currentPosition) {
+              positionsArray.push(Cesium.Cartesian3.fromDegrees(
+                currentPosition.longitude,
+                currentPosition.latitude,
+                currentPosition.altitude
+              ));
+            }
+          }
+        } else {
+          // Cartesian가 없는 경우 TLE로 계산
+          const now = this.viewer.clock.currentTime;
+          const currentPosition = this.satelliteManager.calculatePosition(now);
+          if (currentPosition) {
+            positionsArray.push(Cesium.Cartesian3.fromDegrees(
+              currentPosition.longitude,
+              currentPosition.latitude,
+              currentPosition.altitude
+            ));
+          }
+        }
+      } else {
+        // SatelliteEntityManager가 없는 경우 TLE로 계산
+        const now = this.viewer.clock.currentTime;
+        const currentPosition = this.satelliteManager.calculatePosition(now);
+        if (currentPosition) {
+          positionsArray.push(Cesium.Cartesian3.fromDegrees(
+            currentPosition.longitude,
+            currentPosition.latitude,
+            currentPosition.altitude
+          ));
+        }
+      }
+
+      // 미래 위치들 추가
+      positionsArray.push(...futurePositions);
+
+      return positionsArray;
+    }, false);
+
+    this.predictedPathEntity = this.viewer.entities.add({
+      name: `궤적 (과거 1시간 + 미래 1시간)`,
+      polyline: {
+        positions: positions,
+        width: 4,
+        material: new Cesium.PolylineGlowMaterialProperty({
+          glowPower: 0.3,
+          color: Cesium.Color.ORANGE.withAlpha(0.7),
+        }),
+        clampToGround: false,
+        arcType: Cesium.ArcType.GEODESIC,
+        show: true,
+      },
+    });
   }
 
   /**

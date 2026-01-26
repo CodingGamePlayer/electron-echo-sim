@@ -671,3 +671,40 @@ html, body, #cesiumContainer {
 .tab-content.active {
   display: block;
 }
+
+/* 카메라 추적 버튼 (우측 하단) */
+.camera-track-button {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1001;
+  padding: 12px 20px;
+  background: rgba(42, 42, 42, 0.95);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-family: sans-serif;
+}
+
+.camera-track-button:hover {
+  background: rgba(60, 60, 60, 0.95);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.camera-track-button.active {
+  background: rgba(76, 175, 80, 0.9);
+  border-color: #4CAF50;
+  color: white;
+}
+
+.camera-track-button.active:hover {
+  background: rgba(69, 160, 73, 0.95);
+  border-color: #45a049;
+}

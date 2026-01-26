@@ -36,7 +36,7 @@ export class EntityManager {
 
     this.satelliteEntityManager = new SatelliteEntityManager(viewer, satelliteManager);
     this.positionUpdateManager = new PositionUpdateManager(viewer, satelliteManager, this.satelliteEntityManager);
-    this.predictedPathManager = new PredictedPathManager(viewer, satelliteManager);
+    this.predictedPathManager = new PredictedPathManager(viewer, satelliteManager, this.satelliteEntityManager);
     this.headingCalculator = new HeadingCalculator(satelliteManager, viewer);
     this.swathTrackingManager = new SwathTrackingManager(
       this.swathManager,

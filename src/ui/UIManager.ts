@@ -1,5 +1,6 @@
 import { SatelliteManager } from '../satellite/SatelliteManager.js';
 import { EntityManager } from '../entity/EntityManager.js';
+import { CesiumViewerManager } from '../cesium/CesiumViewerManager.js';
 import { TLEUIManager } from './TLEUIManager.js';
 import { SwathControlUIManager } from './SwathControlUIManager.js';
 import { SwathGroupsUIManager } from './SwathGroupsUIManager.js';
@@ -14,6 +15,7 @@ export class UIManager {
   private satelliteManager: SatelliteManager;
   private entityManager: EntityManager;
   private viewer: any;
+  private viewerManager: CesiumViewerManager | null;
   private tleUIManager: TLEUIManager;
   private swathControlUIManager: SwathControlUIManager;
   private swathGroupsUIManager: SwathGroupsUIManager;
@@ -21,10 +23,11 @@ export class UIManager {
   private signalVisualizationPanel: SignalVisualizationPanel;
   private satelliteOrientationUIManager: SatelliteOrientationUIManager;
 
-  constructor(satelliteManager: SatelliteManager, entityManager: EntityManager, viewer?: any) {
+  constructor(satelliteManager: SatelliteManager, entityManager: EntityManager, viewer?: any, viewerManager?: CesiumViewerManager) {
     this.satelliteManager = satelliteManager;
     this.entityManager = entityManager;
     this.viewer = viewer;
+    this.viewerManager = viewerManager || null;
     
     this.tleUIManager = new TLEUIManager(satelliteManager, entityManager);
     this.sarConfigUIManager = new SarConfigUIManager();
@@ -67,6 +70,46 @@ export class UIManager {
     
     // 위성 방향 제어 UI 초기화
     this.satelliteOrientationUIManager.initialize();
+    
+    // 카메라 추적 버튼 초기화
+    this.initializeCameraTrackingButton();
+  }
+
+  /**
+   * 카메라 추적 버튼 초기화
+   */
+  private initializeCameraTrackingButton(): void {
+    const button = document.getElementById('cameraTrackButton');
+    if (!button) {
+      return;
+    }
+
+    button.addEventListener('click', () => {
+      if (!this.viewerManager) {
+        console.warn('[UIManager] ViewerManager가 없어 카메라 추적을 사용할 수 없습니다.');
+        return;
+      }
+
+      const isTracking = this.viewerManager.isTracking();
+      const satelliteEntity = this.entityManager.getEntity();
+
+      if (!satelliteEntity) {
+        console.warn('[UIManager] 위성 엔티티가 없어 카메라 추적을 사용할 수 없습니다.');
+        return;
+      }
+
+      if (isTracking) {
+        // 추적 해제
+        this.viewerManager.untrackEntity();
+        button.textContent = '카메라 고정';
+        button.classList.remove('active');
+      } else {
+        // 추적 시작
+        this.viewerManager.trackEntity(satelliteEntity);
+        button.textContent = '추적 중';
+        button.classList.add('active');
+      }
+    });
   }
 
   /**

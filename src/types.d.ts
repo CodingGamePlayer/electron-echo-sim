@@ -1,3 +1,229 @@
 // Cesium 전역 타입 선언
-declare var Cesium: any;
+declare namespace Cesium {
+  namespace Math {
+    function toRadians(degrees: number): number;
+    function toDegrees(radians: number): number;
+  }
+  
+  namespace Cartesian3 {
+    function fromDegrees(longitude: number, latitude: number, height?: number): Cartesian3;
+    function normalize(cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
+    function multiplyByScalar(cartesian: Cartesian3, scalar: number, result?: Cartesian3): Cartesian3;
+    function add(left: Cartesian3, right: Cartesian3, result?: Cartesian3): Cartesian3;
+    function subtract(left: Cartesian3, right: Cartesian3, result?: Cartesian3): Cartesian3;
+    function cross(left: Cartesian3, right: Cartesian3, result?: Cartesian3): Cartesian3;
+    function distance(left: Cartesian3, right: Cartesian3): number;
+    function lerp(start: Cartesian3, end: Cartesian3, t: number, result?: Cartesian3): Cartesian3;
+    function negate(cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
+  }
+  class Cartesian3 {
+    constructor(x?: number, y?: number, z?: number);
+    x: number;
+    y: number;
+    z: number;
+    clone(result?: Cartesian3): Cartesian3;
+  }
+  
+  namespace Cartesian2 {
+    function fromElements(x: number, y: number, result?: Cartesian2): Cartesian2;
+  }
+  class Cartesian2 {
+    constructor(x?: number, y?: number);
+    x: number;
+    y: number;
+  }
+  
+  namespace Cartographic {
+    function fromCartesian(cartesian: Cartesian3, result?: Cartographic): Cartographic;
+    function toCartesian(cartographic: Cartographic, ellipsoid?: any, result?: Cartesian3): Cartesian3;
+  }
+  class Cartographic {
+    longitude: number;
+    latitude: number;
+    height: number;
+  }
+  
+  namespace JulianDate {
+    function now(): any;
+    function addMinutes(julianDate: any, minutes: number, result?: any): any;
+    function addSeconds(julianDate: any, seconds: number, result?: any): any;
+    function toDate(julianDate: any): Date;
+  }
+  class JulianDate {
+    constructor(julianDayNumber?: number, secondsOfDay?: number);
+  }
+  
+  namespace Quaternion {
+    function fromAxisAngle(axis: Cartesian3, angle: number, result?: Quaternion): Quaternion;
+    function multiply(left: Quaternion, right: Quaternion, result?: Quaternion): Quaternion;
+    const IDENTITY: Quaternion;
+  }
+  class Quaternion {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+  }
+  
+  namespace Matrix3 {
+    function fromQuaternion(quaternion: Quaternion, result?: Matrix3): Matrix3;
+    function multiplyByVector(matrix: Matrix3, cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
+  }
+  class Matrix3 {
+    // Matrix3 타입 정의
+  }
+  
+  // Viewer 및 기타 클래스들
+  class Viewer {
+    constructor(container: string | HTMLElement, options?: any);
+    cesiumWidget: any;
+    clock: any;
+    scene: any;
+  }
+  
+  namespace Terrain {
+    function fromWorldTerrain(options?: any): any;
+  }
+  
+  enum ClockRange {
+    CLAMPED = 0,
+    UNBOUNDED = 1,
+    LOOP_STOP = 2
+  }
+  
+  // Color 관련
+  namespace Color {
+    function fromCssColorString(color: string, result?: Color): Color;
+    const YELLOW: Color;
+    const WHITE: Color;
+    const BLACK: Color;
+    const CYAN: Color;
+    const RED: Color;
+    const GREEN: Color;
+    const BLUE: Color;
+    const ORANGE: Color;
+    const PURPLE: Color;
+    const GRAY: Color;
+    const TRANSPARENT: Color;
+  }
+  class Color {
+    red: number;
+    green: number;
+    blue: number;
+    alpha: number;
+    withAlpha(alpha: number, result?: Color): Color;
+  }
+  
+  // Property 관련
+  class CallbackProperty {
+    constructor(callback: () => any, isConstant?: boolean);
+  }
+  
+  class ConstantPositionProperty {
+    constructor(value: Cartesian3);
+  }
+  
+  class VelocityOrientationProperty {
+    constructor(position: any, ellipsoid?: any);
+  }
+  
+  // Material 관련
+  class PolylineGlowMaterialProperty {
+    constructor(options?: any);
+  }
+  
+  // Geometry 관련
+  class PolygonHierarchy {
+    constructor(positions: Cartesian3[], holes?: PolygonHierarchy[]);
+    positions: Cartesian3[];
+    holes?: PolygonHierarchy[];
+  }
+  
+  namespace GeometryInstance {
+    function fromGeometry(geometry: any, attributes?: any, id?: any): any;
+  }
+  class GeometryInstance {
+    constructor(options?: any);
+  }
+  
+  namespace PolygonGeometry {
+    function fromPositions(positions: Cartesian3[], options?: any): any;
+  }
+  class PolygonGeometry {
+    constructor(options?: any);
+  }
+  
+  class GroundPrimitive {
+    constructor(options?: any);
+  }
+  
+  namespace ColorGeometryInstanceAttribute {
+    function fromColor(color: Color, result?: any): any;
+  }
+  
+  class PerInstanceColorAppearance {
+    constructor(options?: any);
+  }
+  
+  // Imagery 관련
+  namespace ImageryLayer {
+    function fromProviderAsync(imageryProvider: any, options?: any): Promise<ImageryLayer>;
+  }
+  class ImageryLayer {
+    constructor(imageryProvider: any, options?: any);
+  }
+  
+  namespace IonImageryProvider {
+    function fromAssetId(assetId: number, options?: any): IonImageryProvider;
+  }
+  class IonImageryProvider {
+    constructor(options?: any);
+  }
+  
+  // Buildings 관련
+  function createOsmBuildingsAsync(options?: any): Promise<any>;
+  
+  // Enum 관련
+  enum ArcType {
+    NONE = 0,
+    GEODESIC = 1,
+    RHUMB = 2
+  }
+  
+  enum ClassificationType {
+    TERRAIN = 0,
+    CESIUM_3D_TILE = 1,
+    BOTH = 2
+  }
+  
+  enum LabelStyle {
+    FILL = 0,
+    OUTLINE = 1,
+    FILL_AND_OUTLINE = 2
+  }
+  
+  enum VerticalOrigin {
+    BOTTOM = 0,
+    CENTER = 1,
+    TOP = 2,
+    BASELINE = 3
+  }
+  
+  enum HorizontalOrigin {
+    LEFT = 0,
+    CENTER = 1,
+    RIGHT = 2
+  }
+  
+  enum HeightReference {
+    NONE = 0,
+    CLAMP_TO_GROUND = 1,
+    RELATIVE_TO_GROUND = 2
+  }
+  
+  class NearFarScalar {
+    constructor(near?: number, nearValue?: number, far?: number, farValue?: number);
+  }
+}
+declare var Cesium: typeof Cesium;
 declare var satellite: any;

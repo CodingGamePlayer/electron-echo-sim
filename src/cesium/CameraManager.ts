@@ -3,9 +3,11 @@
  */
 export class CameraManager {
   private viewer: any;
+  private isTrackingSatellite: boolean;
 
   constructor(viewer: any) {
     this.viewer = viewer;
+    this.isTrackingSatellite = false;
   }
 
   /**
@@ -21,5 +23,34 @@ export class CameraManager {
       orientation: orientation,
       duration: duration
     });
+  }
+
+  /**
+   * 위성 엔티티에 카메라 고정
+   */
+  trackEntity(entity: any): void {
+    if (!this.viewer || !entity) {
+      return;
+    }
+    this.viewer.trackedEntity = entity;
+    this.isTrackingSatellite = true;
+  }
+
+  /**
+   * 카메라 추적 해제
+   */
+  untrackEntity(): void {
+    if (!this.viewer) {
+      return;
+    }
+    this.viewer.trackedEntity = undefined;
+    this.isTrackingSatellite = false;
+  }
+
+  /**
+   * 위성 추적 상태 반환
+   */
+  isTracking(): boolean {
+    return this.isTrackingSatellite;
   }
 }

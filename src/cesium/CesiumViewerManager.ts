@@ -65,6 +65,36 @@ export class CesiumViewerManager {
   }
 
   /**
+   * 위성 엔티티에 카메라 고정
+   */
+  trackEntity(entity: any): void {
+    if (!this.cameraManager) {
+      throw new Error('Viewer가 초기화되지 않았습니다.');
+    }
+    this.cameraManager.trackEntity(entity);
+  }
+
+  /**
+   * 카메라 추적 해제
+   */
+  untrackEntity(): void {
+    if (!this.cameraManager) {
+      throw new Error('Viewer가 초기화되지 않았습니다.');
+    }
+    this.cameraManager.untrackEntity();
+  }
+
+  /**
+   * 위성 추적 상태 반환
+   */
+  isTracking(): boolean {
+    if (!this.cameraManager) {
+      return false;
+    }
+    return this.cameraManager.isTracking();
+  }
+
+  /**
    * 뷰어 인스턴스 반환
    */
   getViewer(): any {
