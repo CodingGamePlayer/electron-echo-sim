@@ -31,8 +31,8 @@ export class SatelliteEntityManager {
     this.axisLength = 50000; // 기본값: 50km
     this.yaw = 0;
     this.pitch = 0;
-    this.roll = 30;  // 기본 roll 30도
-    this.useCustomOrientation = false;
+    this.roll = 47;  // 기본 roll 47도
+    this.useCustomOrientation = true;  // 기본으로 커스텀 방향 사용
   }
 
   /**

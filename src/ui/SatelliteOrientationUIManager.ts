@@ -52,10 +52,10 @@ export class SatelliteOrientationUIManager {
     this.pitchInput.value = currentOrientation.pitch.toString();
     this.rollInput.value = currentOrientation.roll.toString();
     
-    // 기본 roll이 30도가 되도록 설정 (EntityManager에서 이미 설정되어 있지만 UI도 동기화)
+    // 기본 roll이 47도가 되도록 설정 (EntityManager에서 이미 설정되어 있지만 UI도 동기화)
     if (currentOrientation.roll === 0 && this.rollInput.value === '0') {
-      this.rollInput.value = '30';
-      this.satelliteEntityManager.setOrientation(currentOrientation.yaw, currentOrientation.pitch, 30);
+      this.rollInput.value = '47';
+      this.satelliteEntityManager.setOrientation(currentOrientation.yaw, currentOrientation.pitch, 47);
     }
 
     // 값 표시 업데이트

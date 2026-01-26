@@ -50,7 +50,7 @@
           <div class="sidebar-section" style="margin-top: 20px;">
             <h3>위성 자세 제어</h3>
             <label style="margin-bottom: 15px;">
-              <input type="checkbox" id="useCustomOrientation"> 커스텀 방향 사용
+              <input type="checkbox" id="useCustomOrientation" checked> 커스텀 방향 사용
               <div class="info">체크하면 Yaw, Pitch, Roll을 수동으로 제어할 수 있습니다.</div>
             </label>
 
@@ -80,7 +80,7 @@
               <label>
                 Roll (X축 회전) - 좌우 기울어짐 ⭐ SAR에서 가장 중요:
                 <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                  <input type="range" id="satelliteRoll" min="-90" max="90" step="0.1" value="30" style="flex: 1;">
+                  <input type="range" id="satelliteRoll" min="-90" max="90" step="0.1" value="47" style="flex: 1;">
                   <span id="satelliteRollValue" style="min-width: 50px; text-align: right;">0.0°</span>
                 </div>
                 <div class="info">SAR 빔이 좌우로 이동. Range 방향 위치 오차, 스와스 이동, 간섭계(InSAR) 오차 발생.</div>

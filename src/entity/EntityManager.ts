@@ -45,6 +45,7 @@ export class EntityManager {
       this.satelliteEntityManager
     );
     this.swathPreviewManager = new SwathPreviewManager(
+      viewer,
       this.swathManager,
       this.headingCalculator,
       this.satelliteEntityManager
