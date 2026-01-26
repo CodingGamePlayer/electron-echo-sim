@@ -15,6 +15,7 @@ from pathlib import Path
 from sar_simulator.common import SarSystemConfig, Target, TargetList
 from sar_simulator.sensor import SarSensorSimulator
 from sar_simulator.echo import SarEchoSimulator
+from sar_simulator.io.png_writer import save_echo_signals_as_grayscale_png
 
 
 # 출력 디렉토리
@@ -453,6 +454,15 @@ def test_multiple_pulses():
         config,
         OUTPUT_DIR / "test_first_pulse.png"
     )
+    
+    # 그레이스케일 PNG 생성 (echo_simulator_cmd와 동일한 형태)
+    save_echo_signals_as_grayscale_png(
+        echo_signals,
+        OUTPUT_DIR / "test_multiple_pulses_grayscale.png",
+        max_amplitude=pulses_max
+    )
+    print(f"\n그레이스케일 PNG 생성 완료: {OUTPUT_DIR / 'test_multiple_pulses_grayscale.png'}")
+    print("  echo_simulator_cmd와 동일한 형태의 '네모에 하나의 점' 결과 확인 가능")
 
 
 if __name__ == "__main__":

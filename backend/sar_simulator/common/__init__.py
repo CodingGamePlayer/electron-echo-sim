@@ -31,6 +31,14 @@ from sar_simulator.common.propagation_model import (
     calc_path_loss,
 )
 
+from sar_simulator.common.math_utils import (
+    dB,
+    dB10,
+    dB20,
+    dB2Linear10,
+    dB2Linear20,
+)
+
 __all__ = [
     "LIGHT_SPEED",
     "BOLZMAN_CONST",
@@ -44,4 +52,9 @@ __all__ = [
     "calc_ambiguous_time_delay",
     "calc_atmospheric_loss",
     "calc_path_loss",
+    "dB",
+    "dB10",
+    "dB20",
+    "dB2Linear10",
+    "dB2Linear20",
 ]

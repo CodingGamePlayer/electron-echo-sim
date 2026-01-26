@@ -6,6 +6,7 @@ pytest>=7.0.0
 matplotlib>=3.5.0  # 시각화용
 psutil>=5.9.0  # 메모리 사용량 측정 (필수)
 tqdm>=4.64.0   # 진행 상황 표시 (필수)
+Pillow>=9.0.0  # PNG 이미지 저장용
 
 # API 서버 의존성
 fastapi>=0.104.0
