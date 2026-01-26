@@ -31,7 +31,7 @@ export class SatelliteEntityManager {
     this.axisLength = 50000; // 기본값: 50km
     this.yaw = 0;
     this.pitch = 0;
-    this.roll = 0;
+    this.roll = 30;  // 기본 roll 30도
     this.useCustomOrientation = false;
   }
 
@@ -104,11 +104,12 @@ export class SatelliteEntityManager {
    */
   updatePosition(position: { longitude: number; latitude: number; altitude: number }, altitudeOffset: number = 0): void {
     if (position && this.position) {
-      const adjustedAltitude = position.altitude + altitudeOffset;
+      // altitudeOffset은 더 이상 사용하지 않지만 호환성을 위해 유지
+      // position.altitude에 이미 최종 고도가 포함되어 있음
       const cartesian = Cesium.Cartesian3.fromDegrees(
         position.longitude,
         position.latitude,
-        adjustedAltitude
+        position.altitude
       );
       this.currentCartesian = cartesian.clone();
       this.position.setValue(cartesian);

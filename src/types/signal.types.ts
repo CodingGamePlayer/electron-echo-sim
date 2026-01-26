@@ -55,6 +55,19 @@ export interface EchoSimulationResponse {
 }
 
 /**
+ * 여러 펄스 Echo 시뮬레이션 응답
+ */
+export interface EchoMultipleResponse {
+  success: boolean;
+  message: string;
+  shape: number[];  // [num_pulses, num_samples]
+  dtype: string;
+  data: string;    // Base64 인코딩된 데이터
+  num_pulses: number;
+  num_samples: number;
+}
+
+/**
  * Signal 통계 정보
  */
 export interface SignalStatistics {

@@ -22,6 +22,7 @@ export class SignalVisualizationPanel {
   private sidebar: HTMLElement;
   private chirpCanvas: HTMLCanvasElement | null;
   private echoCanvas: HTMLCanvasElement | null;
+  private detailedChirpCanvas: HTMLCanvasElement | null;
   private chirpStatisticsDiv: HTMLElement | null;
   private echoStatisticsDiv: HTMLElement | null;
   private modal: HTMLElement | null;
@@ -40,6 +41,7 @@ export class SignalVisualizationPanel {
 
     this.chirpCanvas = document.getElementById('chirpSignalCanvas') as HTMLCanvasElement;
     this.echoCanvas = document.getElementById('echoSignalCanvas') as HTMLCanvasElement;
+    this.detailedChirpCanvas = document.getElementById('detailedChirpCanvas') as HTMLCanvasElement;
     this.chirpStatisticsDiv = document.getElementById('chirpStatistics') as HTMLElement;
     this.echoStatisticsDiv = document.getElementById('echoStatistics') as HTMLElement;
 
@@ -108,12 +110,19 @@ export class SignalVisualizationPanel {
         this.openModal('Echo Signal', 'echo');
       });
     }
+
+    if (this.detailedChirpCanvas) {
+      this.detailedChirpCanvas.style.cursor = 'pointer';
+      this.detailedChirpCanvas.addEventListener('click', () => {
+        this.openModal('상세 Chirp Signal - Time Domain (With Carrier Frequency)', 'detailedChirp');
+      });
+    }
   }
 
   /**
    * 모달 열기
    */
-  private openModal(title: string, signalType: 'chirp' | 'echo'): void {
+  private openModal(title: string, signalType: 'chirp' | 'echo' | 'detailedChirp'): void {
     if (!this.modal || !this.modalCanvas || !this.modalTitle) return;
     
     this.modalTitle.textContent = title;
@@ -130,6 +139,8 @@ export class SignalVisualizationPanel {
       this.drawSignalOnModal(this.modalCanvas, this.currentChirpData, this.currentConfig, signalType);
     } else if (signalType === 'echo' && this.currentEchoData && this.currentConfig) {
       this.drawSignalOnModal(this.modalCanvas, this.currentEchoData, this.currentConfig, signalType);
+    } else if (signalType === 'detailedChirp' && this.currentChirpData && this.currentConfig) {
+      this.drawDetailedChirpOnModal(this.modalCanvas, this.currentChirpData, this.currentConfig);
     }
   }
 
@@ -908,5 +919,494 @@ export class SignalVisualizationPanel {
         </div>
       `;
     }
+  }
+
+  /**
+   * 상세 Chirp Signal 그래프 표시 (6개 서브플롯)
+   * test_integration.py의 visualize_chirp_signal과 동일한 방식
+   */
+  displayDetailedChirpSignal(chirpData: Complex64Array, config: any): void {
+    if (!this.detailedChirpCanvas) {
+      console.warn('상세 Chirp Canvas를 찾을 수 없습니다.');
+      return;
+    }
+
+    // Canvas 표시
+    this.detailedChirpCanvas.style.display = 'block';
+
+    requestAnimationFrame(() => {
+      const ctx = this.detailedChirpCanvas!.getContext('2d');
+      if (!ctx) return;
+
+      const contentArea = document.getElementById('signalResultsContent');
+      let width = 370;
+      let height = 400;
+
+      if (contentArea) {
+        const contentRect = contentArea.getBoundingClientRect();
+        width = Math.floor(contentRect.width - 30);
+        // 높이는 고정 (단일 서브플롯)
+        height = 400;
+      }
+
+      this.detailedChirpCanvas!.width = width;
+      this.detailedChirpCanvas!.height = height;
+
+      const numSamples = chirpData.real.length;
+      if (numSamples === 0) return;
+
+      // 시간 벡터 생성 (중심이 0이 되도록)
+      const dt = 1.0 / config.fs;
+      const n = numSamples;
+      const t: number[] = [];
+      for (let i = 0; i < n; i++) {
+        t.push((i - n / 2) * dt);
+      }
+      const tUs = t.map(tVal => tVal * 1e6); // 마이크로초 단위
+
+      // Chirp rate 계산
+      const chirpRate = config.bw / config.taup;
+      const instantaneousFreq = t.map(tVal => chirpRate * tVal);
+
+      // 반송파 주파수 포함 신호 계산
+      const phiWithCarrier = t.map(tVal => 
+        2 * Math.PI * (config.fc * tVal + (chirpRate / 2) * tVal * tVal)
+      );
+      const chirpWithCarrier = phiWithCarrier.map(phi => Math.cos(phi));
+
+      // 복소수 배열에서 데이터 추출
+      const real = Array.from(chirpData.real);
+      const imag = Array.from(chirpData.imag);
+      const magnitude = Array.from(SignalDataProcessor.computeMagnitude(chirpData));
+      const phase = Array.from(SignalDataProcessor.computePhase(chirpData));
+
+      // FFT 계산은 더 이상 필요 없음 (Time Domain만 표시)
+
+      // 서브플롯 설정 (Time Domain with Carrier Frequency만 표시)
+      const numSubplots = 1;
+      const subplotHeight = height;
+      const padding = 50;
+      const plotWidth = width - 2 * padding;
+      const plotHeight = subplotHeight - padding * 2;
+
+      // 배경 지우기
+      ctx.fillStyle = '#1e1e1e';
+      ctx.fillRect(0, 0, width, height);
+
+      // 1. 시간 영역 (반송파 포함) - 이것만 표시
+      this.drawSubplot(
+        ctx,
+        0,
+        subplotHeight,
+        padding,
+        plotWidth,
+        plotHeight,
+        tUs,
+        chirpWithCarrier,
+        'Time (μs)',
+        'Amplitude',
+        'Chirp Signal - Time Domain (With Carrier Frequency)',
+        '#4CAF50',
+        { min: Math.min(...tUs), max: Math.max(...tUs) }
+      );
+    });
+  }
+
+  /**
+   * 단일 라인 서브플롯 그리기
+   */
+  private drawSubplot(
+    ctx: CanvasRenderingContext2D,
+    subplotIndex: number,
+    subplotHeight: number,
+    padding: number,
+    plotWidth: number,
+    plotHeight: number,
+    xData: number[],
+    yData: number[],
+    xLabel: string,
+    yLabel: string,
+    title: string,
+    color: string,
+    xRange: { min: number; max: number }
+  ): void {
+    const yOffset = subplotIndex * subplotHeight;
+    const xMin = xRange.min;
+    const xMax = xRange.max;
+    const xRangeVal = xMax - xMin;
+    const yMin = Math.min(...yData);
+    const yMax = Math.max(...yData);
+    const yRange = yMax - yMin || 1;
+
+    // 그리드 그리기
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const y = yOffset + padding + (plotHeight / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(padding + plotWidth, y);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (plotWidth / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, yOffset + padding);
+      ctx.lineTo(x, yOffset + padding + plotHeight);
+      ctx.stroke();
+    }
+
+    // 데이터 그리기
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < xData.length; i++) {
+      const x = padding + ((xData[i] - xMin) / xRangeVal) * plotWidth;
+      const y = yOffset + padding + plotHeight - ((yData[i] - yMin) / yRange) * plotHeight;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+
+    // 제목 및 레이블
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, padding + plotWidth / 2, yOffset + 20);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(xLabel, padding + plotWidth / 2, yOffset + padding + plotHeight + 25);
+
+    ctx.save();
+    ctx.translate(15, yOffset + padding + plotHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
+  }
+
+  /**
+   * 이중 라인 서브플롯 그리기
+   */
+  private drawDualLineSubplot(
+    ctx: CanvasRenderingContext2D,
+    subplotIndex: number,
+    subplotHeight: number,
+    padding: number,
+    plotWidth: number,
+    plotHeight: number,
+    xData: number[],
+    yData1: number[],
+    yData2: number[],
+    xLabel: string,
+    yLabel: string,
+    title: string,
+    color1: string,
+    color2: string,
+    label1: string,
+    label2: string,
+    xRange: { min: number; max: number },
+    yRange?: { min: number; max: number }
+  ): void {
+    const yOffset = subplotIndex * subplotHeight;
+    const xMin = xRange.min;
+    const xMax = xRange.max;
+    const xRangeVal = xMax - xMin;
+    
+    const allY = [...yData1, ...yData2];
+    const yMin = yRange ? yRange.min : Math.min(...allY);
+    const yMax = yRange ? yRange.max : Math.max(...allY);
+    const yRangeVal = yMax - yMin || 1;
+
+    // 그리드 그리기
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 10; i++) {
+      const y = yOffset + padding + (plotHeight / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(padding + plotWidth, y);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (plotWidth / 10) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, yOffset + padding);
+      ctx.lineTo(x, yOffset + padding + plotHeight);
+      ctx.stroke();
+    }
+
+    // 첫 번째 라인
+    ctx.strokeStyle = color1;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < xData.length; i++) {
+      const x = padding + ((xData[i] - xMin) / xRangeVal) * plotWidth;
+      const y = yOffset + padding + plotHeight - ((yData1[i] - yMin) / yRangeVal) * plotHeight;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+
+    // 두 번째 라인
+    ctx.strokeStyle = color2;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < xData.length; i++) {
+      const x = padding + ((xData[i] - xMin) / xRangeVal) * plotWidth;
+      const y = yOffset + padding + plotHeight - ((yData2[i] - yMin) / yRangeVal) * plotHeight;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+
+    // 범례
+    ctx.fillStyle = color1;
+    ctx.fillRect(padding + plotWidth - 150, yOffset + padding + 10, 10, 10);
+    ctx.fillStyle = '#fff';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label1, padding + plotWidth - 135, yOffset + padding + 18);
+
+    ctx.fillStyle = color2;
+    ctx.fillRect(padding + plotWidth - 150, yOffset + padding + 25, 10, 10);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label2, padding + plotWidth - 135, yOffset + padding + 33);
+
+    // 제목 및 레이블
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, padding + plotWidth / 2, yOffset + 20);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(xLabel, padding + plotWidth / 2, yOffset + padding + plotHeight + 25);
+
+    ctx.save();
+    ctx.translate(15, yOffset + padding + plotHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
+  }
+
+  /**
+   * 확대 영역 서브플롯 그리기
+   */
+  private drawZoomRegionsSubplot(
+    ctx: CanvasRenderingContext2D,
+    subplotIndex: number,
+    subplotHeight: number,
+    padding: number,
+    plotWidth: number,
+    plotHeight: number,
+    tData: number[],
+    yData: number[],
+    regions: Array<{ name: string; start: number; end: number; color: string }>,
+    xLabel: string,
+    yLabel: string,
+    title: string
+  ): void {
+    const yOffset = subplotIndex * subplotHeight;
+    const tUs = tData.map(t => t * 1e6);
+
+    // 각 영역 그리기
+    regions.forEach((region, regionIdx) => {
+      const startIdx = tData.findIndex(t => t >= region.start);
+      const endIdx = tData.findIndex(t => t >= region.end);
+      if (startIdx === -1 || endIdx === -1 || endIdx <= startIdx) return;
+
+      const regionTUs = tUs.slice(startIdx, endIdx);
+      const regionY = yData.slice(startIdx, endIdx);
+      const xMin = Math.min(...regionTUs);
+      const xMax = Math.max(...regionTUs);
+      const xRange = xMax - xMin;
+      const yMin = Math.min(...regionY);
+      const yMax = Math.max(...regionY);
+      const yRange = yMax - yMin || 1;
+
+      ctx.strokeStyle = region.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < regionTUs.length; i++) {
+        const x = padding + ((regionTUs[i] - xMin) / xRange) * (plotWidth / regions.length) + (plotWidth / regions.length) * regionIdx;
+        const y = yOffset + padding + plotHeight - ((regionY[i] - yMin) / yRange) * plotHeight;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    });
+
+    // 제목 및 레이블
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(title, padding + plotWidth / 2, yOffset + 20);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(xLabel, padding + plotWidth / 2, yOffset + padding + plotHeight + 25);
+  }
+
+  /**
+   * 모달에 상세 Chirp Signal 그리기
+   */
+  private drawDetailedChirpOnModal(canvas: HTMLCanvasElement, chirpData: Complex64Array, config: any): void {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 60;
+
+    const numSamples = chirpData.real.length;
+    if (numSamples === 0) return;
+
+    // 시간 벡터 생성 (중심이 0이 되도록)
+    const dt = 1.0 / config.fs;
+    const n = numSamples;
+    const t: number[] = [];
+    for (let i = 0; i < n; i++) {
+      t.push((i - n / 2) * dt);
+    }
+    const tUs = t.map(tVal => tVal * 1e6); // 마이크로초 단위
+
+    // Chirp rate 계산
+    const chirpRate = config.bw / config.taup;
+
+    // 반송파 주파수 포함 신호 계산
+    const phiWithCarrier = t.map(tVal => 
+      2 * Math.PI * (config.fc * tVal + (chirpRate / 2) * tVal * tVal)
+    );
+    const chirpWithCarrier = phiWithCarrier.map(phi => Math.cos(phi));
+
+    const plotHeight = height - 2 * padding;
+    const plotWidth = width - 2 * padding;
+
+    // 배경 지우기
+    ctx.fillStyle = '#1e1e1e';
+    ctx.fillRect(0, 0, width, height);
+
+    // 그리드 그리기
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 20; i++) {
+      const y = padding + (plotHeight / 20) * i;
+      ctx.beginPath();
+      ctx.moveTo(padding, y);
+      ctx.lineTo(width - padding, y);
+      ctx.stroke();
+    }
+    for (let i = 0; i <= 20; i++) {
+      const x = padding + (plotWidth / 20) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, padding);
+      ctx.lineTo(x, height - padding);
+      ctx.stroke();
+    }
+
+    // X축 레이블
+    const xMin = Math.min(...tUs);
+    const xMax = Math.max(...tUs);
+    const xRange = xMax - xMin;
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = 0; i <= 10; i++) {
+      const x = padding + (plotWidth / 10) * i;
+      const timeValue = xMin + (xRange / 10) * i;
+      ctx.fillText(timeValue.toFixed(1), x, height - padding + 20);
+    }
+
+    // Y축 레이블
+    const yMin = Math.min(...chirpWithCarrier);
+    const yMax = Math.max(...chirpWithCarrier);
+    const yRange = yMax - yMin || 1;
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 10; i++) {
+      const y = padding + (plotHeight / 10) * i;
+      const value = yMax - (yRange / 10) * i;
+      ctx.fillText(value.toFixed(2), padding - 10, y + 5);
+    }
+
+    // 제목
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Chirp Signal - Time Domain (With Carrier Frequency)', width / 2, 30);
+
+    // 축 레이블
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Time (μs)', width / 2, height - 10);
+
+    ctx.save();
+    ctx.translate(20, height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillText('Amplitude', 0, 0);
+    ctx.restore();
+
+    // 신호 그리기
+    const scaleX = plotWidth / xRange;
+    const scaleY = plotHeight / yRange;
+    const centerY = padding + plotHeight / 2;
+
+    ctx.strokeStyle = '#4CAF50';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < numSamples; i++) {
+      const x = padding + (tUs[i] - xMin) * scaleX;
+      const y = centerY - (chirpWithCarrier[i] - (yMin + yMax) / 2) * scaleY;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * 간단한 FFT 계산 (실제로는 더 정교한 FFT 라이브러리 사용 권장)
+   */
+  private computeFFT(real: Float32Array, imag: Float32Array, dt: number): { freq: number[]; magnitude: number[] } {
+    const n = real.length;
+    const freq: number[] = [];
+    const magnitude: number[] = [];
+
+    // 간단한 DFT 구현 (성능을 위해 실제 FFT 라이브러리 사용 권장)
+    for (let k = 0; k < n; k++) {
+      let sumReal = 0;
+      let sumImag = 0;
+      for (let j = 0; j < n; j++) {
+        const angle = -2 * Math.PI * k * j / n;
+        sumReal += real[j] * Math.cos(angle) - imag[j] * Math.sin(angle);
+        sumImag += real[j] * Math.sin(angle) + imag[j] * Math.cos(angle);
+      }
+      const mag = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+      magnitude.push(mag);
+      freq.push((k < n / 2 ? k : k - n) / (n * dt) / 1e6); // MHz
+    }
+
+    return { freq, magnitude };
   }
 }

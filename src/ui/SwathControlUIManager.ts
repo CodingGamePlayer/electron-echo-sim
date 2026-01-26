@@ -8,7 +8,7 @@ import { getCurrentSatelliteStateForEcho } from '../utils/satellite-state-helper
 import { generateChirpSignal, convertSarConfigToRequest, SarSystemConfigRequest } from '../utils/chirp-api-client.js';
 import { simulateEcho } from '../utils/echo-api-client.js';
 import { SignalDataProcessor } from '../utils/signal-data-processor.js';
-import { ChirpSimulationResponse, EchoSimulationResponse } from '../types/signal.types.js';
+import { ChirpSimulationResponse, EchoSimulationResponse, EchoMultipleResponse } from '../types/signal.types.js';
 import { SatelliteManager } from '../satellite/SatelliteManager.js';
 
 /**
@@ -24,8 +24,10 @@ export class SwathControlUIManager {
   private realtimeTrackingControls: HTMLDivElement | null;
   private staticModeControls: HTMLDivElement | null;
   private staticAddSwathBtn: HTMLButtonElement | null;
+  private batchProcessingControls: HTMLDivElement | null;
   private isRealtimeTrackingActive: boolean;
   private onGroupListUpdate?: () => void;
+  private pulseCountUpdateInterval: number | null;
 
   constructor(
     entityManager: EntityManager,
@@ -41,7 +43,9 @@ export class SwathControlUIManager {
     this.realtimeTrackingControls = null;
     this.staticModeControls = null;
     this.staticAddSwathBtn = null;
+    this.batchProcessingControls = null;
     this.isRealtimeTrackingActive = false;
+    this.pulseCountUpdateInterval = null;
   }
 
   /**
@@ -60,11 +64,14 @@ export class SwathControlUIManager {
     this.realtimeTrackingControls = document.getElementById('realtimeTrackingControls') as HTMLDivElement;
     this.staticModeControls = document.getElementById('staticModeControls') as HTMLDivElement;
     this.staticAddSwathBtn = document.getElementById('staticAddSwathBtn') as HTMLButtonElement;
+    this.batchProcessingControls = document.getElementById('batchProcessingControls') as HTMLDivElement;
 
     this.setupSwathControlHandlers();
     this.setupRealtimeTrackingButton();
     this.setupStaticModeButton();
+    this.setupBatchProcessingHandlers();
     this.updateSwathPreview();
+    this.updateBatchInfo();
   }
 
   /**
@@ -140,6 +147,9 @@ export class SwathControlUIManager {
         if (this.staticModeControls) {
           this.staticModeControls.style.display = 'none';
         }
+        if (this.batchProcessingControls) {
+          this.batchProcessingControls.style.display = 'block';
+        }
         
         if (this.isRealtimeTrackingActive) {
           this.entityManager.stopRealtimeSwathTracking();
@@ -153,6 +163,9 @@ export class SwathControlUIManager {
         if (this.realtimeTrackingControls) {
           this.realtimeTrackingControls.style.display = 'none';
         }
+        if (this.batchProcessingControls) {
+          this.batchProcessingControls.style.display = 'none';
+        }
         
         if (this.isRealtimeTrackingActive) {
           this.entityManager.stopRealtimeSwathTracking();
@@ -164,6 +177,9 @@ export class SwathControlUIManager {
         }
         if (this.staticModeControls) {
           this.staticModeControls.style.display = 'none';
+        }
+        if (this.batchProcessingControls) {
+          this.batchProcessingControls.style.display = 'none';
         }
         
         if (this.isRealtimeTrackingActive) {
@@ -186,12 +202,18 @@ export class SwathControlUIManager {
       if (this.staticModeControls) {
         this.staticModeControls.style.display = 'none';
       }
+      if (this.batchProcessingControls) {
+        this.batchProcessingControls.style.display = 'block';
+      }
     } else if (swathMode.value === 'static') {
       if (this.staticModeControls) {
         this.staticModeControls.style.display = 'block';
       }
       if (this.realtimeTrackingControls) {
         this.realtimeTrackingControls.style.display = 'none';
+      }
+      if (this.batchProcessingControls) {
+        this.batchProcessingControls.style.display = 'none';
       }
     } else {
       if (this.realtimeTrackingControls) {
@@ -200,9 +222,138 @@ export class SwathControlUIManager {
       if (this.staticModeControls) {
         this.staticModeControls.style.display = 'none';
       }
+      if (this.batchProcessingControls) {
+        this.batchProcessingControls.style.display = 'none';
+      }
     }
     
     this.updateSwathPreview();
+  }
+
+  /**
+   * 배치 처리 핸들러 설정
+   */
+  private setupBatchProcessingHandlers(): void {
+    const pulseBatchMode = document.getElementById('pulseBatchMode') as HTMLSelectElement;
+    const pulseBatchValue = document.getElementById('pulseBatchValue') as HTMLInputElement;
+
+    if (!pulseBatchMode || !pulseBatchValue) {
+      return;
+    }
+
+    // 배치 모드 변경 시
+    pulseBatchMode.addEventListener('change', () => {
+      this.updateBatchInfo();
+      this.applyBatchConfig();
+    });
+
+    // 배치 값 변경 시
+    pulseBatchValue.addEventListener('input', () => {
+      this.updateBatchInfo();
+      this.applyBatchConfig();
+    });
+
+    // SAR 설정 변경 감지 (PRF 변경 시 배치 정보 업데이트)
+    if (this.sarConfigUIManager) {
+      // SAR 설정이 변경될 때마다 배치 정보 업데이트
+      // 실제로는 SAR 설정 UI에서 이벤트를 발생시켜야 하지만,
+      // 여기서는 주기적으로 확인하거나 다른 방법 사용
+      setInterval(() => {
+        this.updateBatchInfo();
+      }, 1000); // 1초마다 확인
+    }
+
+    // 실시간 추적 중일 때 Pulse 개수 업데이트 (더 자주)
+    this.startPulseCountUpdate();
+  }
+
+  /**
+   * Pulse 개수 업데이트 시작
+   */
+  private startPulseCountUpdate(): void {
+    // 기존 인터벌 정리
+    if (this.pulseCountUpdateInterval !== null) {
+      clearInterval(this.pulseCountUpdateInterval);
+    }
+
+    // 200ms마다 Pulse 개수 업데이트 (실시간 추적 중일 때 빠른 업데이트)
+    this.pulseCountUpdateInterval = window.setInterval(() => {
+      if (this.isRealtimeTrackingActive) {
+        this.updateBatchInfo();
+      }
+    }, 200);
+  }
+
+  /**
+   * Pulse 개수 업데이트 중지
+   */
+  private stopPulseCountUpdate(): void {
+    if (this.pulseCountUpdateInterval !== null) {
+      clearInterval(this.pulseCountUpdateInterval);
+      this.pulseCountUpdateInterval = null;
+    }
+  }
+
+  /**
+   * 배치 정보 업데이트 (PRF/PRI/배치 시간 표시)
+   */
+  private updateBatchInfo(): void {
+    const currentPrfSpan = document.getElementById('currentPrf');
+    const currentPriSpan = document.getElementById('currentPri');
+    const calculatedBatchTimeSpan = document.getElementById('calculatedBatchTime');
+    const currentPulseCountSpan = document.getElementById('currentPulseCount');
+    const pulseBatchUnit = document.getElementById('pulseBatchUnit');
+    const pulseBatchMode = document.getElementById('pulseBatchMode') as HTMLSelectElement;
+    const pulseBatchValue = document.getElementById('pulseBatchValue') as HTMLInputElement;
+
+    if (!currentPrfSpan || !currentPriSpan || !calculatedBatchTimeSpan || !pulseBatchUnit || !pulseBatchMode || !pulseBatchValue) {
+      return;
+    }
+
+    // 현재 SAR 설정에서 PRF 가져오기
+    const sarConfig = this.sarConfigUIManager?.getCurrentSarConfig();
+    const prf = sarConfig?.prf || 5000; // 기본값: 5000 Hz
+    const pri = prf > 0 ? 1 / prf : 0.0002;
+
+    // PRF/PRI 표시
+    currentPrfSpan.textContent = prf.toString();
+    currentPriSpan.textContent = pri.toFixed(6);
+
+    // 배치 모드에 따라 단위 및 배치 시간 계산
+    const batchValue = parseFloat(pulseBatchValue.value) || 100;
+    
+    if (pulseBatchMode.value === 'count') {
+      pulseBatchUnit.textContent = '개';
+      const batchTime = prf > 0 ? batchValue / prf : 0.02;
+      calculatedBatchTimeSpan.textContent = batchTime.toFixed(4);
+    } else {
+      pulseBatchUnit.textContent = '초';
+      const batchTime = batchValue;
+      calculatedBatchTimeSpan.textContent = batchTime.toFixed(2);
+    }
+
+    // 현재 쌓인 Pulse 개수 업데이트
+    if (currentPulseCountSpan) {
+      const pulseCount = this.entityManager.getCurrentPulseCount();
+      currentPulseCountSpan.textContent = pulseCount.toString();
+    }
+  }
+
+  /**
+   * 배치 설정 적용
+   */
+  private applyBatchConfig(): void {
+    const pulseBatchMode = document.getElementById('pulseBatchMode') as HTMLSelectElement;
+    const pulseBatchValue = document.getElementById('pulseBatchValue') as HTMLInputElement;
+
+    if (!pulseBatchMode || !pulseBatchValue) {
+      return;
+    }
+
+    const mode = pulseBatchMode.value as 'count' | 'time';
+    const value = parseFloat(pulseBatchValue.value) || 100;
+
+    this.entityManager.setSwathTrackingBatchConfig(mode, value);
   }
 
   /**
@@ -414,16 +565,118 @@ export class SwathControlUIManager {
       // 사이드바가 완전히 렌더링된 후 Canvas 그리기
       setTimeout(() => {
         if (this.signalVisualizationPanel) {
-      this.signalVisualizationPanel.displayChirpSignal(chirpData, config, { normalize: false });
-      // Echo Signal은 값이 매우 작으므로 정규화하여 표시 (최대값으로 나누어 0~1 범위로)
-      this.signalVisualizationPanel.displayEchoSignal(echoData, config, { normalize: true });
-      this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
+          // 기존 간단한 Chirp 그래프
+          this.signalVisualizationPanel.displayChirpSignal(chirpData, config, { normalize: false });
+          // 상세 Chirp 그래프 (Time Domain with Carrier Frequency)
+          this.signalVisualizationPanel.displayDetailedChirpSignal(chirpData, config);
+          // Echo Signal은 값이 매우 작으므로 정규화하여 표시 (최대값으로 나누어 0~1 범위로)
+          this.signalVisualizationPanel.displayEchoSignal(echoData, config, { normalize: true });
+          this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
           console.log('Signal 패널 표시 완료');
         }
       }, 100);
     } catch (error: any) {
       console.error('Signal 시각화 실패:', error);
       throw new Error(`Signal 시각화 실패: ${error.message}`);
+    }
+  }
+
+  /**
+   * 여러 Pulse Echo 결과 표시
+   */
+  private async displayMultipleEchoResults(result: any): Promise<void> {
+    if (!this.signalVisualizationPanel || !result || !result.echoResult) {
+      console.warn('Signal 시각화 패널 또는 결과가 없습니다.');
+      return;
+    }
+
+    try {
+      const echoResult: EchoMultipleResponse = result.echoResult;
+      const sarConfig = this.sarConfigUIManager?.getCurrentSarConfig();
+      if (!sarConfig) {
+        throw new Error('SAR 설정을 가져올 수 없습니다.');
+      }
+
+      // SAR 설정을 API 요청 형식으로 변환
+      const configRequest = convertSarConfigToRequest(sarConfig);
+
+      // 1. SAR Signal (Chirp) 생성 (단일 Pulse와 동일)
+      let chirpResult: ChirpSimulationResponse;
+      try {
+        chirpResult = await generateChirpSignal(configRequest);
+      } catch (error: any) {
+        throw new Error(`Chirp 신호 생성 실패: ${error.message}`);
+      }
+
+      // 2. EchoMultipleResponse 디코딩
+      // shape: [num_pulses, num_samples]
+      const numPulses = echoResult.num_pulses || echoResult.shape[0];
+      const numSamples = echoResult.num_samples || echoResult.shape[1];
+
+      // Base64 디코딩
+      const binaryString = atob(echoResult.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      const float32Array = new Float32Array(bytes.buffer);
+      
+      // 여러 Pulse 중 첫 번째 Pulse의 데이터만 사용 (또는 평균)
+      // 각 Pulse는 [real, imag, real, imag, ...] 형태로 저장됨
+      const samplesPerPulse = numSamples * 2; // real + imag
+      const firstPulseStart = 0;
+      
+      // 첫 번째 Pulse의 복소수 데이터 추출
+      const real = new Float32Array(numSamples);
+      const imag = new Float32Array(numSamples);
+      
+      for (let i = 0; i < numSamples; i++) {
+        const idx = firstPulseStart + i * 2;
+        real[i] = float32Array[idx];
+        imag[i] = float32Array[idx + 1];
+      }
+
+      const echoData = { real, imag };
+
+      // Chirp 데이터 디코딩
+      const chirpData = SignalDataProcessor.decodeBase64ComplexData(
+        chirpResult.data,
+        chirpResult.shape
+      );
+
+      // 통계 계산
+      const chirpStats = SignalDataProcessor.computeStatistics(chirpData);
+      const echoStats = SignalDataProcessor.computeStatistics(echoData);
+
+      console.log('여러 Pulse Echo 결과 디코딩 완료:', {
+        numPulses,
+        numSamples,
+        chirpSamples: chirpData.real.length,
+        echoSamples: echoData.real.length,
+        chirpMax: chirpStats.max,
+        echoMax: echoStats.max
+      });
+
+      // Signal 결과 패널 열기
+      this.signalVisualizationPanel.show();
+
+      // 사이드바가 완전히 렌더링된 후 Canvas 그리기
+      setTimeout(() => {
+        if (this.signalVisualizationPanel) {
+          // 기존 간단한 Chirp 그래프
+          this.signalVisualizationPanel.displayChirpSignal(chirpData, sarConfig, { normalize: false });
+          // 상세 Chirp 그래프 (6개 서브플롯)
+          this.signalVisualizationPanel.displayDetailedChirpSignal(chirpData, sarConfig);
+          // Echo Signal은 값이 매우 작으므로 정규화하여 표시
+          this.signalVisualizationPanel.displayEchoSignal(echoData, sarConfig, { normalize: true });
+          this.signalVisualizationPanel.displayStatistics(chirpStats, echoStats);
+          console.log('여러 Pulse Signal 패널 표시 완료');
+        }
+      }, 100);
+    } catch (error: any) {
+      console.error('여러 Pulse Echo 결과 시각화 실패:', error);
+      alert(`Signal 결과 표시 실패: ${error.message}`);
     }
   }
 
@@ -481,10 +734,40 @@ export class SwathControlUIManager {
       return;
     }
 
-    this.realtimeTrackingToggle.addEventListener('click', () => {
+    this.realtimeTrackingToggle.addEventListener('click', async () => {
       if (this.isRealtimeTrackingActive) {
-        this.entityManager.stopRealtimeSwathTracking();
+        // 종료 시 쌓인 Pulse 처리
+        const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
+        const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
+        const swathAzimuthLength = document.getElementById('swathAzimuthLength') as HTMLInputElement;
+        
+        const swathParams = {
+          nearRange: parseFloat(swathNearRange?.value || '200000'),
+          farRange: this.calculateFarRange(),
+          swathWidth: parseFloat(swathWidth?.value || '400000'),
+          azimuthLength: parseFloat(swathAzimuthLength?.value || '50000'),
+        };
+
+        try {
+          const result = await this.entityManager.stopRealtimeSwathTracking(true, swathParams);
+          
+          // 결과가 있으면 Signal 결과 패널에 표시
+          if (result && result.echoResult) {
+            await this.displayMultipleEchoResults(result);
+          }
+        } catch (error: any) {
+          console.error('Pulse 처리 실패:', error);
+          alert(`Pulse 처리 실패: ${error.message}`);
+        }
+
         this.isRealtimeTrackingActive = false;
+        this.stopPulseCountUpdate();
+        
+        // Pulse 개수 초기화
+        const currentPulseCountSpan = document.getElementById('currentPulseCount');
+        if (currentPulseCountSpan) {
+          currentPulseCountSpan.textContent = '0';
+        }
       } else {
         const swathNearRange = document.getElementById('swathNearRange') as HTMLInputElement;
         const swathWidth = document.getElementById('swathWidth') as HTMLInputElement;
@@ -493,6 +776,51 @@ export class SwathControlUIManager {
         const swathAlpha = document.getElementById('swathAlpha') as HTMLInputElement;
         const swathMaxCount = document.getElementById('swathMaxCount') as HTMLInputElement;
         const swathUpdateInterval = document.getElementById('swathUpdateInterval') as HTMLInputElement;
+
+        // 배치 설정 적용
+        this.applyBatchConfig();
+
+        // 배치 처리를 위한 의존성 설정
+        if (this.satelliteManager && this.viewer) {
+          const sarConfigGetter = () => this.sarConfigUIManager?.getCurrentSarConfig() || null;
+          
+          this.entityManager.setSwathTrackingBatchDependencies(
+            this.satelliteManager,
+            sarConfigGetter,
+            async (result) => {
+              // 100개 도달 시 자동 처리 콜백
+              console.log('100개 도달 - 배치 처리 완료:', result);
+              if (result && result.echoResult) {
+                await this.displayMultipleEchoResults(result);
+              }
+            }
+          );
+          
+          // 100개 자동 처리 활성화
+          this.entityManager.setSwathTrackingAutoProcess(true);
+          
+          // 100개 도달 시 자동 종료 콜백 설정
+          this.entityManager.setSwathTrackingAutoStopCallback(() => {
+            // 실시간 추적 종료
+            if (this.isRealtimeTrackingActive) {
+              this.entityManager.stopRealtimeSwathTracking(false).then(() => {
+                this.isRealtimeTrackingActive = false;
+                this.stopPulseCountUpdate();
+                this.updateRealtimeTrackingButton();
+                
+                // Pulse 개수 초기화
+                const currentPulseCountSpan = document.getElementById('currentPulseCount');
+                if (currentPulseCountSpan) {
+                  currentPulseCountSpan.textContent = '0';
+                }
+                
+                console.log('100개 배치 완료 - 실시간 추적 자동 종료');
+              }).catch(error => {
+                console.error('자동 종료 실패:', error);
+              });
+            }
+          });
+        }
 
         this.entityManager.startRealtimeSwathTracking(
           {
@@ -509,6 +837,9 @@ export class SwathControlUIManager {
           }
         );
         this.isRealtimeTrackingActive = true;
+        
+        // Pulse 개수 업데이트 시작
+        this.startPulseCountUpdate();
       }
       
       this.updateRealtimeTrackingButton();

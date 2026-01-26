@@ -42,7 +42,7 @@ export class SatelliteOrientationUIManager {
     this.resetButton = document.getElementById('resetOrientation') as HTMLButtonElement;
 
     if (!this.yawInput || !this.pitchInput || !this.rollInput) {
-      console.warn('위성 방향 제어 UI 요소를 찾을 수 없습니다.');
+      console.warn('위성 자세 제어 UI 요소를 찾을 수 없습니다.');
       return;
     }
 
@@ -51,6 +51,12 @@ export class SatelliteOrientationUIManager {
     this.yawInput.value = currentOrientation.yaw.toString();
     this.pitchInput.value = currentOrientation.pitch.toString();
     this.rollInput.value = currentOrientation.roll.toString();
+    
+    // 기본 roll이 30도가 되도록 설정 (EntityManager에서 이미 설정되어 있지만 UI도 동기화)
+    if (currentOrientation.roll === 0 && this.rollInput.value === '0') {
+      this.rollInput.value = '30';
+      this.satelliteEntityManager.setOrientation(currentOrientation.yaw, currentOrientation.pitch, 30);
+    }
 
     // 값 표시 업데이트
     this.updateValueDisplays();
@@ -192,5 +198,36 @@ export class SatelliteOrientationUIManager {
    */
   getCurrentOrientation(): { yaw: number; pitch: number; roll: number } {
     return this.satelliteEntityManager.getOrientation();
+  }
+
+  /**
+   * Bus 자세 설정
+   * Backend에서 가져온 bus 자세 값을 UI에 적용
+   * @param busRoll Bus roll 각도 (deg)
+   * @param busPitch Bus pitch 각도 (deg)
+   * @param busYaw Bus yaw 각도 (deg)
+   */
+  setBusAttitude(busRoll: number, busPitch: number, busYaw: number): void {
+    // UI 요소가 초기화되지 않았으면 초기화
+    if (!this.yawInput || !this.pitchInput || !this.rollInput) {
+      this.initialize();
+    }
+
+    // 슬라이더와 입력 필드 값 업데이트
+    if (this.yawInput) {
+      this.yawInput.value = busYaw.toString();
+    }
+    if (this.pitchInput) {
+      this.pitchInput.value = busPitch.toString();
+    }
+    if (this.rollInput) {
+      this.rollInput.value = busRoll.toString();
+    }
+
+    // SatelliteEntityManager에 적용
+    this.satelliteEntityManager.setOrientation(busYaw, busPitch, busRoll);
+
+    // 값 표시 업데이트
+    this.updateValueDisplays();
   }
 }

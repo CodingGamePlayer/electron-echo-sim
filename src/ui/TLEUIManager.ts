@@ -36,6 +36,48 @@ export class TLEUIManager {
     }
 
     this.setupHandlers();
+    
+    // 초기 TLE가 있으면 고도 계산 및 표시
+    if (defaultTLE && defaultTLE.trim()) {
+      this.calculateAndDisplayAltitude(defaultTLE);
+    }
+  }
+
+  /**
+   * TLE로부터 고도 계산 및 UI에 표시 (km 단위)
+   */
+  private calculateAndDisplayAltitude(tleText: string): void {
+    try {
+      // TLE 텍스트로 직접 계산 (satelliteManager가 아직 초기화되지 않았을 수 있음)
+      if (!tleText || !tleText.trim()) {
+        console.warn('[TLEUIManager] TLE 텍스트가 비어있습니다.');
+        return;
+      }
+      
+      const currentTime = Cesium.JulianDate.now();
+      const tempManager = new SatelliteManager(tleText);
+      const position = tempManager.calculatePosition(currentTime);
+      
+      if (position) {
+        if (position.altitude !== undefined && position.altitude !== null && !isNaN(position.altitude)) {
+          const altitudeInput = document.getElementById('satelliteAltitude') as HTMLInputElement;
+          if (altitudeInput) {
+            // 미터를 킬로미터로 변환하여 표시
+            const altitudeKm = position.altitude / 1000;
+            altitudeInput.value = altitudeKm.toFixed(2);
+            console.log(`[TLEUIManager] 초기 고도 계산: ${altitudeKm.toFixed(2)}km (${Math.round(position.altitude)}m) - 위도: ${position.latitude.toFixed(4)}°, 경도: ${position.longitude.toFixed(4)}°`);
+          } else {
+            console.warn('[TLEUIManager] 고도 입력 필드를 찾을 수 없습니다.');
+          }
+        } else {
+          console.warn('[TLEUIManager] 계산된 위치에 고도 정보가 없거나 유효하지 않습니다:', position.altitude);
+        }
+      } else {
+        console.warn('[TLEUIManager] TLE 위치 계산 결과가 null입니다.');
+      }
+    } catch (error) {
+      console.error('[TLEUIManager] 초기 고도 계산 실패:', error);
+    }
   }
 
   /**
@@ -72,7 +114,21 @@ export class TLEUIManager {
         const startTime = Cesium.JulianDate.now();
         const initialPos = this.satelliteManager.calculatePosition(startTime);
         if (initialPos) {
+          // 계산된 고도를 UI에 표시 (km 단위)
+          const altitudeInput = document.getElementById('satelliteAltitude') as HTMLInputElement;
+          if (altitudeInput && initialPos.altitude) {
+            // 미터를 킬로미터로 변환하여 표시
+            const altitudeKm = initialPos.altitude / 1000;
+            altitudeInput.value = altitudeKm.toFixed(2);
+            console.log(`[TLEUIManager] TLE 적용 - 계산된 고도: ${altitudeKm.toFixed(2)}km (${Math.round(initialPos.altitude)}m)`);
+          }
+          
+          // 커스텀 고도 초기화 (TLE 고도 사용)
+          this.entityManager.setCustomAltitude(null);
+          
           this.entityManager.updatePosition(initialPos);
+        } else {
+          console.error('[TLEUIManager] TLE 위치 계산 실패');
         }
         
         // 예상 경로 다시 그리기
@@ -95,18 +151,26 @@ export class TLEUIManager {
       }
     });
 
-    // 위성 고도 오프셋 조정
-    const altitudeOffsetInput = document.getElementById('satelliteAltitudeOffset') as HTMLInputElement;
-    if (altitudeOffsetInput) {
-      altitudeOffsetInput.addEventListener('change', () => {
-        const offset = parseFloat(altitudeOffsetInput.value || '0');
-        this.entityManager.setAltitudeOffset(offset);
-        this.updatePositionIfNeeded();
+    // 위성 고도 설정 (km 단위 입력을 미터로 변환)
+    const altitudeInput = document.getElementById('satelliteAltitude') as HTMLInputElement;
+    if (altitudeInput) {
+      altitudeInput.addEventListener('change', () => {
+        const altitudeKm = parseFloat(altitudeInput.value || '0');
+        if (altitudeKm >= 0) {
+          // km를 미터로 변환하여 저장
+          const altitudeM = altitudeKm * 1000;
+          this.entityManager.setCustomAltitude(altitudeM);
+          this.updatePositionIfNeeded();
+        }
       });
-      altitudeOffsetInput.addEventListener('input', () => {
-        const offset = parseFloat(altitudeOffsetInput.value || '0');
-        this.entityManager.setAltitudeOffset(offset);
-        this.updatePositionIfNeeded();
+      altitudeInput.addEventListener('input', () => {
+        const altitudeKm = parseFloat(altitudeInput.value || '0');
+        if (altitudeKm >= 0) {
+          // km를 미터로 변환하여 저장
+          const altitudeM = altitudeKm * 1000;
+          this.entityManager.setCustomAltitude(altitudeM);
+          this.updatePositionIfNeeded();
+        }
       });
     }
   }

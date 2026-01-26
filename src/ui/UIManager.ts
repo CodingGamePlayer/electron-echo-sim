@@ -58,9 +58,12 @@ export class UIManager {
     this.swathGroupsUIManager.initialize();
     
     // SAR 설정 불러오기 시 Swath 제어 탭에 자동 적용
-    this.sarConfigUIManager.initialize((sarConfig) => {
-      this.swathControlUIManager.applySarConfigToSwathParams(sarConfig);
-    });
+    this.sarConfigUIManager.initialize(
+      (sarConfig) => {
+        this.swathControlUIManager.applySarConfigToSwathParams(sarConfig);
+      },
+      this.satelliteOrientationUIManager
+    );
     
     // 위성 방향 제어 UI 초기화
     this.satelliteOrientationUIManager.initialize();

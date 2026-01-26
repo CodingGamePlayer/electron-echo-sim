@@ -33,6 +33,9 @@ interface SarConfigDetail extends SarSystemConfig {
   description?: string;
   created_at: string;
   updated_at: string;
+  bus_roll_angle?: number;
+  bus_pitch_angle?: number;
+  bus_yaw_angle?: number;
 }
 
 interface SarConfigItem {
@@ -57,6 +60,7 @@ const API_BASE_URL = 'http://localhost:8000/api';
 export class SarConfigUIManager {
   private onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void;
   private currentSarConfig: SarConfigDetail | null = null;
+  private satelliteOrientationUIManager?: any; // SatelliteOrientationUIManager 참조
 
   /**
    * 현재 선택된 SAR 설정 가져오기
@@ -68,8 +72,9 @@ export class SarConfigUIManager {
   /**
    * SAR 설정 UI 초기화
    */
-  initialize(onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void): void {
+  initialize(onConfigLoaded?: (sarConfig: SwathCalcSarConfig) => void, satelliteOrientationUIManager?: any): void {
     this.onConfigLoaded = onConfigLoaded;
+    this.satelliteOrientationUIManager = satelliteOrientationUIManager;
     this.setupHandlers();
     this.loadSarConfigList();
   }
@@ -188,6 +193,20 @@ export class SarConfigUIManager {
             az_angle: (record as any).az_angle
           };
           this.onConfigLoaded(swathConfig);
+        }
+
+        // Bus 자세를 위성 방향 제어에 적용
+        if (this.satelliteOrientationUIManager) {
+          const busRoll = record.bus_roll_angle ?? 0;
+          const busPitch = record.bus_pitch_angle ?? 0;
+          const busYaw = record.bus_yaw_angle ?? 0;
+          
+          // 값이 하나라도 있으면 적용 (모두 0이 아닐 수도 있음)
+          if (record.bus_roll_angle !== null && record.bus_roll_angle !== undefined ||
+              record.bus_pitch_angle !== null && record.bus_pitch_angle !== undefined ||
+              record.bus_yaw_angle !== null && record.bus_yaw_angle !== undefined) {
+            this.satelliteOrientationUIManager.setBusAttitude(busRoll, busPitch, busYaw);
+          }
         }
 
         alert('설정을 불러왔습니다.');
