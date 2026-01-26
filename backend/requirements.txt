@@ -3,13 +3,20 @@ scipy>=1.7.0
 astropy>=5.0.0
 h5py>=3.0.0
 pytest>=7.0.0
+matplotlib>=3.5.0  # Visualization
+psutil>=5.9.0  # Memory usage measurement (required)
+tqdm>=4.64.0   # Progress bar (required)
+Pillow>=9.0.0  # PNG image saving
 
-# API 서버 의존성
+# API server dependencies
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 pydantic>=2.0.0
 python-multipart>=0.0.6
-httpx>=0.24.0  # 테스트 클라이언트용
+httpx>=0.24.0  # Test client
 
-# 데이터베이스 의존성
+# Database dependencies
 sqlalchemy>=2.0.0
+
+# YAML parsing (for SSP files)
+pyyaml>=6.0

@@ -4,6 +4,8 @@ dist
 *.zip
 echo_sim_cmd_2026_0109_정해찬
 tiles
+*.png
+python-3.14.2-embed-amd64
 
 # Python
 __pycache__/

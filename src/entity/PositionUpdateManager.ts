@@ -9,7 +9,7 @@ export class PositionUpdateManager {
   private satelliteManager: SatelliteManager;
   private entityManager: SatelliteEntityManager;
   private postRenderHandler: (() => void) | null;
-  private altitudeOffset: number;
+  private customAltitude: number | null;  // null이면 TLE 고도 사용, 값이 있으면 해당 고도 사용
   private onPreviewUpdate?: (params: any, options?: any) => void;
 
   constructor(
@@ -21,14 +21,15 @@ export class PositionUpdateManager {
     this.satelliteManager = satelliteManager;
     this.entityManager = entityManager;
     this.postRenderHandler = null;
-    this.altitudeOffset = 0;
+    this.customAltitude = null;
   }
 
   /**
-   * 고도 오프셋 설정
+   * 커스텀 고도 설정
+   * @param altitude 고도 (m), null이면 TLE로 계산된 고도 사용
    */
-  setAltitudeOffset(offset: number): void {
-    this.altitudeOffset = offset;
+  setCustomAltitude(altitude: number | null): void {
+    this.customAltitude = altitude;
   }
 
   /**
@@ -56,11 +57,12 @@ export class PositionUpdateManager {
         const positionData = this.satelliteManager.calculatePosition(currentTime);
         
         if (positionData) {
-          const adjustedAltitude = positionData.altitude + this.altitudeOffset;
+          // 커스텀 고도가 설정되어 있으면 사용, 없으면 TLE로 계산된 고도 사용
+          const finalAltitude = this.customAltitude !== null ? this.customAltitude : positionData.altitude;
           const newCartesian = Cesium.Cartesian3.fromDegrees(
             positionData.longitude,
             positionData.latitude,
-            adjustedAltitude
+            finalAltitude
           );
           
           const distance = Cesium.Cartesian3.distance(currentCartesian, newCartesian);

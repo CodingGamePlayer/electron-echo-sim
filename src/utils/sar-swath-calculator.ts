@@ -86,12 +86,43 @@ export class SARSwathCalculator {
   /**
    * Cesium Cartesian3 좌표 배열로 변환
    */
-  static cornersToCartesian(corners: SwathCorners): any[] {
-    return [
-      Cesium.Cartesian3.fromDegrees(corners.topLeft[0], corners.topLeft[1]),
-      Cesium.Cartesian3.fromDegrees(corners.topRight[0], corners.topRight[1]),
-      Cesium.Cartesian3.fromDegrees(corners.bottomRight[0], corners.bottomRight[1]),
-      Cesium.Cartesian3.fromDegrees(corners.bottomLeft[0], corners.bottomLeft[1])
-    ];
+  static cornersToCartesian(corners: SwathCorners): Cesium.Cartesian3[] {
+    try {
+      const positions: Cesium.Cartesian3[] = [];
+      
+      // 각 corner를 Cartesian3로 변환
+      const cornerKeys: Array<keyof SwathCorners> = ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'];
+      for (const key of cornerKeys) {
+        const corner = corners[key];
+        if (!Array.isArray(corner) || corner.length < 2) {
+          throw new Error(`Invalid corner: ${key}`);
+        }
+        const lon = corner[0];
+        const lat = corner[1];
+        if (typeof lon !== 'number' || typeof lat !== 'number' || isNaN(lon) || isNaN(lat)) {
+          throw new Error(`Invalid corner coordinates: ${key}`);
+        }
+        const cartesian = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+        if (!cartesian || isNaN(cartesian.x) || isNaN(cartesian.y) || isNaN(cartesian.z)) {
+          throw new Error(`Failed to create Cartesian3 for corner: ${key}`);
+        }
+        positions.push(cartesian);
+      }
+      
+      if (positions.length !== 4) {
+        throw new Error(`Expected 4 positions, got ${positions.length}`);
+      }
+      
+      return positions;
+    } catch (error) {
+      console.error('[SARSwathCalculator] cornersToCartesian 오류:', error);
+      // 기본값 반환
+      return [
+        Cesium.Cartesian3.fromDegrees(0, 0, 0),
+        Cesium.Cartesian3.fromDegrees(0.001, 0, 0),
+        Cesium.Cartesian3.fromDegrees(0.001, 0.001, 0),
+        Cesium.Cartesian3.fromDegrees(0, 0.001, 0)
+      ];
+    }
   }
 }

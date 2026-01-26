@@ -16,6 +16,7 @@ export class SwathManager {
   private nextSwathId: number;
   private updateHandlers: Map<string, (() => void)>;
   public onSwathAdded?: (groupId: string, swathId: string) => void;  // 그룹 추가 콜백
+  public onPulseAdded?: (swathId: string, geometry: SARSwathGeometry, satelliteState: any) => void;  // Pulse 추가 콜백
 
   private static readonly DEFAULT_OPTIONS: SwathVisualizationOptions = {
     mode: SwathMode.STATIC,
@@ -132,6 +133,11 @@ export class SwathManager {
         // 그룹에 Swath 추가 (콜백을 통해)
         if (groupId && (this as any).onSwathAdded) {
           (this as any).onSwathAdded(groupId, newSwathId);
+        }
+
+        // Pulse 추가 콜백 호출 (위성 상태는 SwathTrackingManager에서 처리)
+        if ((this as any).onPulseAdded) {
+          (this as any).onPulseAdded(newSwathId, updatedGeometry);
         }
         
         // 최대 개수 제한 체크 (새 Swath 추가 후 호출)

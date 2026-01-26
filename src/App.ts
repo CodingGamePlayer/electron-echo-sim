@@ -66,7 +66,7 @@ export class App {
       }, 1000); // 초기화 후 1초 뒤에 경로 그리기
 
       // 6. UI 매니저 초기화
-      this.uiManager = new UIManager(this.satelliteManager, this.entityManager);
+      this.uiManager = new UIManager(this.satelliteManager, this.entityManager, viewer);
       this.uiManager.initialize(this.defaultTLE);
 
       // 7. 카메라 설정

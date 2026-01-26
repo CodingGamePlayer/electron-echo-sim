@@ -52,6 +52,23 @@ class SarSystemConfigRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: str = Field("Beam0000", description="빔 ID")
+    el_angle: float = Field(0.0, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: float = Field(0.0, description="Azimuth angle (deg) - rank 계산에 사용")
+    
+    # SSP 파일 추가 파라미터
+    chirp_set_size: Optional[int] = Field(None, description="Chirp 세트 크기")
+    echo_generator: Optional[str] = Field(None, description="Echo 생성기 타입")
+    num_pulses: Optional[int] = Field(None, description="펄스 개수")
+    pulse_num: Optional[int] = Field(None, description="펄스 번호")
+    begin_time: Optional[datetime] = Field(None, description="시작 시간")
+    bus_roll_angle: Optional[float] = Field(None, description="버스 롤 각도 (deg)")
+    bus_pitch_angle: Optional[float] = Field(None, description="버스 피치 각도 (deg)")
+    bus_yaw_angle: Optional[float] = Field(None, description="버스 요 각도 (deg)")
+    bus_roll_rate: Optional[float] = Field(None, description="버스 롤 각속도 (deg/s)")
+    bus_pitch_rate: Optional[float] = Field(None, description="버스 피치 각속도 (deg/s)")
+    bus_yaw_rate: Optional[float] = Field(None, description="버스 요 각속도 (deg/s)")
+    mode: Optional[str] = Field(None, description="SAR 모드 (STRIPMAP, SCANSAR 등)")
+    num_repeats: Optional[int] = Field(None, description="반복 횟수")
     
     def to_sar_system_config(self) -> SarSystemConfig:
         """SarSystemConfig 객체로 변환"""
@@ -146,6 +163,23 @@ class SarConfigCreateRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: str = Field("Beam0000", description="빔 ID")
+    el_angle: float = Field(0.0, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: float = Field(0.0, description="Azimuth angle (deg) - rank 계산에 사용")
+    
+    # SSP 파일 추가 파라미터
+    chirp_set_size: Optional[int] = Field(None, description="Chirp 세트 크기")
+    echo_generator: Optional[str] = Field(None, description="Echo 생성기 타입")
+    num_pulses: Optional[int] = Field(None, description="펄스 개수")
+    pulse_num: Optional[int] = Field(None, description="펄스 번호")
+    begin_time: Optional[datetime] = Field(None, description="시작 시간")
+    bus_roll_angle: Optional[float] = Field(None, description="버스 롤 각도 (deg)")
+    bus_pitch_angle: Optional[float] = Field(None, description="버스 피치 각도 (deg)")
+    bus_yaw_angle: Optional[float] = Field(None, description="버스 요 각도 (deg)")
+    bus_roll_rate: Optional[float] = Field(None, description="버스 롤 각속도 (deg/s)")
+    bus_pitch_rate: Optional[float] = Field(None, description="버스 피치 각속도 (deg/s)")
+    bus_yaw_rate: Optional[float] = Field(None, description="버스 요 각속도 (deg/s)")
+    mode: Optional[str] = Field(None, description="SAR 모드 (STRIPMAP, SCANSAR 등)")
+    num_repeats: Optional[int] = Field(None, description="반복 횟수")
     
     def to_sar_system_config(self) -> SarSystemConfig:
         """SarSystemConfig 객체로 변환"""
@@ -234,6 +268,23 @@ class SarConfigUpdateRequest(BaseModel):
     
     # 빔 파라미터
     beam_id: Optional[str] = Field(None, description="빔 ID")
+    el_angle: Optional[float] = Field(None, description="Elevation angle (deg) - rank 계산에 사용")
+    az_angle: Optional[float] = Field(None, description="Azimuth angle (deg) - rank 계산에 사용")
+    
+    # SSP 파일 추가 파라미터
+    chirp_set_size: Optional[int] = Field(None, description="Chirp 세트 크기")
+    echo_generator: Optional[str] = Field(None, description="Echo 생성기 타입")
+    num_pulses: Optional[int] = Field(None, description="펄스 개수")
+    pulse_num: Optional[int] = Field(None, description="펄스 번호")
+    begin_time: Optional[datetime] = Field(None, description="시작 시간")
+    bus_roll_angle: Optional[float] = Field(None, description="버스 롤 각도 (deg)")
+    bus_pitch_angle: Optional[float] = Field(None, description="버스 피치 각도 (deg)")
+    bus_yaw_angle: Optional[float] = Field(None, description="버스 요 각도 (deg)")
+    bus_roll_rate: Optional[float] = Field(None, description="버스 롤 각속도 (deg/s)")
+    bus_pitch_rate: Optional[float] = Field(None, description="버스 피치 각속도 (deg/s)")
+    bus_yaw_rate: Optional[float] = Field(None, description="버스 요 각속도 (deg/s)")
+    mode: Optional[str] = Field(None, description="SAR 모드 (STRIPMAP, SCANSAR 등)")
+    num_repeats: Optional[int] = Field(None, description="반복 횟수")
 
 
 class SarConfigItem(BaseModel):
@@ -286,6 +337,23 @@ class SarConfigDetail(SarConfigItem):
     
     # 빔 파라미터
     beam_id: str
+    el_angle: float
+    az_angle: float
+    
+    # SSP 파일 추가 파라미터
+    chirp_set_size: Optional[int] = None
+    echo_generator: Optional[str] = None
+    num_pulses: Optional[int] = None
+    pulse_num: Optional[int] = None
+    begin_time: Optional[datetime] = None
+    bus_roll_angle: Optional[float] = None
+    bus_pitch_angle: Optional[float] = None
+    bus_yaw_angle: Optional[float] = None
+    bus_roll_rate: Optional[float] = None
+    bus_pitch_rate: Optional[float] = None
+    bus_yaw_rate: Optional[float] = None
+    mode: Optional[str] = None
+    num_repeats: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 

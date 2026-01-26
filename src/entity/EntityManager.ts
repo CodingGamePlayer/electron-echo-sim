@@ -24,7 +24,7 @@ export class EntityManager {
   private swathTrackingManager: SwathTrackingManager;
   private swathPreviewManager: SwathPreviewManager;
   private headingOffset: number;
-  private altitudeOffset: number;
+  private customAltitude: number | null;  // null이면 TLE 고도 사용, 값이 있으면 해당 고도 사용
 
   constructor(viewer: any, satelliteManager: SatelliteManager) {
     this.viewer = viewer;
@@ -32,9 +32,9 @@ export class EntityManager {
     this.swathManager = new SwathManager(viewer);
     this.swathGroupManager = new SwathGroupManager(this.swathManager);
     this.headingOffset = 0;
-    this.altitudeOffset = 0;
+    this.customAltitude = null;
 
-    this.satelliteEntityManager = new SatelliteEntityManager(viewer);
+    this.satelliteEntityManager = new SatelliteEntityManager(viewer, satelliteManager);
     this.positionUpdateManager = new PositionUpdateManager(viewer, satelliteManager, this.satelliteEntityManager);
     this.predictedPathManager = new PredictedPathManager(viewer, satelliteManager);
     this.headingCalculator = new HeadingCalculator(satelliteManager, viewer);
@@ -45,6 +45,7 @@ export class EntityManager {
       this.satelliteEntityManager
     );
     this.swathPreviewManager = new SwathPreviewManager(
+      viewer,
       this.swathManager,
       this.headingCalculator,
       this.satelliteEntityManager
@@ -91,7 +92,12 @@ export class EntityManager {
    * 엔티티 위치 즉시 업데이트
    */
   updatePosition(position: { longitude: number; latitude: number; altitude: number }): void {
-    this.satelliteEntityManager.updatePosition(position, this.altitudeOffset);
+    // 커스텀 고도가 설정되어 있으면 사용, 없으면 TLE로 계산된 고도 사용
+    const finalAltitude = this.customAltitude !== null ? this.customAltitude : position.altitude;
+    this.satelliteEntityManager.updatePosition(
+      { ...position, altitude: finalAltitude },
+      0  // 오프셋은 더 이상 사용하지 않음
+    );
   }
 
   /**
@@ -142,14 +148,76 @@ export class EntityManager {
     options?: any
   ): void {
     this.swathTrackingManager.setHeadingOffset(this.headingOffset);
+    
+    // 배치 처리를 위한 의존성 설정 (필요한 경우)
+    // 실제로는 SwathControlUIManager에서 설정하도록 함
+    
     this.swathTrackingManager.startRealtimeSwathTracking(swathParams, options);
   }
 
   /**
-   * 실시간 Swath 추적 중지
+   * SwathTrackingManager의 배치 처리 의존성 설정
    */
-  stopRealtimeSwathTracking(): void {
-    this.swathTrackingManager.stopRealtimeSwathTracking();
+  setSwathTrackingBatchDependencies(
+    satelliteManager: SatelliteManager,
+    sarConfigGetter: () => any,
+    batchProcessingCallback?: (result: any) => void
+  ): void {
+    this.swathTrackingManager.setBatchProcessingDependencies(
+      this,
+      satelliteManager,
+      this.viewer,
+      sarConfigGetter
+    );
+    
+    if (batchProcessingCallback) {
+      this.swathTrackingManager.setBatchProcessingCallback(batchProcessingCallback);
+    }
+  }
+
+  /**
+   * SwathTrackingManager의 배치 설정
+   */
+  setSwathTrackingBatchConfig(mode: 'count' | 'time', value: number): void {
+    this.swathTrackingManager.setBatchConfig(mode, value);
+  }
+
+  /**
+   * SwathTrackingManager의 자동 처리 활성화/비활성화
+   */
+  setSwathTrackingAutoProcess(enabled: boolean): void {
+    this.swathTrackingManager.setAutoProcessEnabled(enabled);
+  }
+
+  /**
+   * SwathTrackingManager의 자동 종료 콜백 설정
+   */
+  setSwathTrackingAutoStopCallback(callback: () => void): void {
+    this.swathTrackingManager.setAutoStopCallback(callback);
+  }
+
+  /**
+   * 현재 쌓인 Pulse 개수 가져오기
+   */
+  getCurrentPulseCount(): number {
+    return this.swathTrackingManager.getCurrentPulseCount();
+  }
+
+  /**
+   * 실시간 Swath 추적 중지
+   * @param processPulses 종료 시 쌓인 Pulse를 처리할지 여부
+   * @param swathParams Swath 파라미터 (Pulse 처리 시 필요)
+   */
+  async stopRealtimeSwathTracking(
+    processPulses: boolean = false,
+    swathParams?: {
+      nearRange?: number;
+      farRange?: number;
+      swathWidth?: number;
+      azimuthLength?: number;
+    }
+  ): Promise<any> {
+    return await this.swathTrackingManager.stopRealtimeSwathTracking(processPulses, swathParams);
   }
 
   /**
@@ -286,12 +354,13 @@ export class EntityManager {
   }
 
   /**
-   * 고도 오프셋 설정
+   * 커스텀 고도 설정
+   * @param altitude 고도 (m), null이면 TLE로 계산된 고도 사용
    */
-  setAltitudeOffset(offset: number): void {
-    this.altitudeOffset = offset;
-    this.positionUpdateManager.setAltitudeOffset(offset);
-    console.log(`[EntityManager] 고도 오프셋 설정: ${offset}미터`);
+  setCustomAltitude(altitude: number | null): void {
+    this.customAltitude = altitude;
+    this.positionUpdateManager.setCustomAltitude(altitude);
+    console.log(`[EntityManager] 커스텀 고도 설정: ${altitude !== null ? altitude + '미터' : 'TLE 고도 사용'}`);
     
     if (this.satelliteManager.useTLE) {
       const currentTime = this.viewer.clock.currentTime;
@@ -303,10 +372,10 @@ export class EntityManager {
   }
 
   /**
-   * 현재 고도 오프셋 반환
+   * 현재 커스텀 고도 반환
    */
-  getAltitudeOffset(): number {
-    return this.altitudeOffset;
+  getCustomAltitude(): number | null {
+    return this.customAltitude;
   }
 
   /**
@@ -329,5 +398,26 @@ export class EntityManager {
    */
   clearSwathPreview(): void {
     this.swathPreviewManager.clearSwathPreview();
+  }
+
+  /**
+   * 축 방향선 표시/숨김 설정
+   */
+  setAxisLinesVisible(visible: boolean): void {
+    this.satelliteEntityManager.setAxisLinesVisible(visible);
+  }
+
+  /**
+   * 축 길이 설정
+   */
+  setAxisLength(length: number): void {
+    this.satelliteEntityManager.setAxisLength(length);
+  }
+
+  /**
+   * SatelliteEntityManager 가져오기
+   */
+  getSatelliteEntityManager(): SatelliteEntityManager {
+    return this.satelliteEntityManager;
   }
 }
