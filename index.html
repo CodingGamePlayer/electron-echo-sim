@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cesium Electron App</title>
   <!-- CesiumJS CSS -->
-  <link href="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <link href="./Cesium/Widgets/widgets.css" rel="stylesheet">
   <!-- 애플리케이션 CSS -->
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -368,13 +368,18 @@
   </div>
   
   <!-- Satellite.js 라이브러리 (TLE 파싱 및 SGP4 계산용) -->
-  <script src="https://cdn.jsdelivr.net/npm/satellite.js@4.1.2/dist/satellite.min.js"></script>
+  <script src="./satellite.min.js"></script>
   
   <!-- CesiumJS JavaScript -->
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.137/Build/Cesium/Cesium.js"></script>
+  <script src="./Cesium/Cesium.js"></script>
   <script type="module">
-    // Cesium ion access token 설정
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwZjEzNDA2OC05MTE2LTQ2ODgtOGJiYi05MDFjNzc2ZDg0NDIiLCJpZCI6MjE1NTM4LCJpYXQiOjE3NjkxNjM4MjB9.-JMo-431f4Bkr6NdfcU8y7WFo0ZTi1BxDInRWHWJhtE';
+    // Cesium baseUrl 설정 (Workers와 Assets를 로컬에서 로드하기 위해 필요)
+    window.CESIUM_BASE_URL = './Cesium/';
+    
+    // Cesium ion access token 비활성화 (오프라인 모드)
+    // 네트워크가 있을 때만 Ion 서비스를 사용하려면 토큰을 설정하되,
+    // 오프라인 환경에서는 빈 문자열로 설정하여 Ion 호출 방지
+    Cesium.Ion.defaultAccessToken = '';
 
     // 클래스 모듈 import
     import { App } from './App.js';

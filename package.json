@@ -28,6 +28,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
-    "cesium": "^1.137.0"
+    "cesium": "^1.137.0",
+    "satellite.js": "^4.1.2"
   }
 }
