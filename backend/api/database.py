@@ -52,6 +52,7 @@ def init_db():
     모든 테이블을 생성합니다.
     """
     from api.models.config import SarConfigModel  # noqa: F401
+    from api.models.tle import TleModel  # noqa: F401
     
     Base.metadata.create_all(bind=engine)
     print(f"데이터베이스 초기화 완료: {DB_PATH}")

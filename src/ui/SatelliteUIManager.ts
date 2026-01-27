@@ -1,6 +1,7 @@
 import { SatelliteManager, SatelliteMode } from '../satellite/SatelliteManager.js';
 import { EntityManager } from '../entity/EntityManager.js';
 import { createSatellite } from '../utils/satellite-api-client.js';
+import { saveTLE, getTLEList, getTLE, deleteTLE, TleResponse } from '../utils/tle-api-client.js';
 
 /**
  * 위성 생성 UI 관리
@@ -22,6 +23,15 @@ export class SatelliteUIManager {
   private missionTimeOffsetTLE: HTMLInputElement | null;
   private moveToMissionLocationTLEButton: HTMLButtonElement | null;
   private tleMissionStatus: HTMLElement | null;
+  private tleList: HTMLSelectElement | null;
+  private loadTLEButton: HTMLButtonElement | null;
+  private deleteTLEButton: HTMLButtonElement | null;
+  private saveTLEButton: HTMLButtonElement | null;
+  private tleSaveDialog: HTMLElement | null;
+  private tleSaveName: HTMLInputElement | null;
+  private tleSaveDescription: HTMLInputElement | null;
+  private tleSaveConfirm: HTMLButtonElement | null;
+  private tleSaveCancel: HTMLButtonElement | null;
 
   constructor(satelliteManager: SatelliteManager, entityManager: EntityManager) {
     this.satelliteManager = satelliteManager;
@@ -40,6 +50,15 @@ export class SatelliteUIManager {
     this.missionTimeOffsetTLE = null;
     this.moveToMissionLocationTLEButton = null;
     this.tleMissionStatus = null;
+    this.tleList = null;
+    this.loadTLEButton = null;
+    this.deleteTLEButton = null;
+    this.saveTLEButton = null;
+    this.tleSaveDialog = null;
+    this.tleSaveName = null;
+    this.tleSaveDescription = null;
+    this.tleSaveConfirm = null;
+    this.tleSaveCancel = null;
   }
 
   /**
@@ -65,6 +84,17 @@ export class SatelliteUIManager {
     this.missionTimeOffsetTLE = document.getElementById('missionTimeOffsetTLE') as HTMLInputElement;
     this.moveToMissionLocationTLEButton = document.getElementById('moveToMissionLocationTLE') as HTMLButtonElement;
     this.tleMissionStatus = document.getElementById('tleMissionStatus');
+    
+    // TLE 저장/불러오기 관련 요소
+    this.tleList = document.getElementById('tleList') as HTMLSelectElement;
+    this.loadTLEButton = document.getElementById('loadTLE') as HTMLButtonElement;
+    this.deleteTLEButton = document.getElementById('deleteTLE') as HTMLButtonElement;
+    this.saveTLEButton = document.getElementById('saveTLE') as HTMLButtonElement;
+    this.tleSaveDialog = document.getElementById('tleSaveDialog');
+    this.tleSaveName = document.getElementById('tleSaveName') as HTMLInputElement;
+    this.tleSaveDescription = document.getElementById('tleSaveDescription') as HTMLInputElement;
+    this.tleSaveConfirm = document.getElementById('tleSaveConfirm') as HTMLButtonElement;
+    this.tleSaveCancel = document.getElementById('tleSaveCancel') as HTMLButtonElement;
 
     if (this.tleInputText && defaultTLE) {
       this.tleInputText.value = defaultTLE;
@@ -75,6 +105,7 @@ export class SatelliteUIManager {
     }
 
     this.setupHandlers();
+    this.loadTLEList();
     
     // 초기 TLE가 있으면 고도 계산 및 표시
     if (defaultTLE && defaultTLE.trim() && this.satelliteAltitudeTLE) {
@@ -175,6 +206,41 @@ export class SatelliteUIManager {
     if (this.applyTLEButton && this.tleInputText && this.useTLECheckbox) {
       this.applyTLEButton.addEventListener('click', () => {
         this.handleApplyTLE();
+      });
+    }
+
+    // TLE 저장 버튼 핸들러
+    if (this.saveTLEButton) {
+      this.saveTLEButton.addEventListener('click', () => {
+        this.showTLESaveDialog();
+      });
+    }
+
+    // TLE 불러오기 버튼 핸들러
+    if (this.loadTLEButton) {
+      this.loadTLEButton.addEventListener('click', () => {
+        this.handleLoadTLE();
+      });
+    }
+
+    // TLE 삭제 버튼 핸들러
+    if (this.deleteTLEButton) {
+      this.deleteTLEButton.addEventListener('click', () => {
+        this.handleDeleteTLE();
+      });
+    }
+
+    // TLE 저장 확인 버튼 핸들러
+    if (this.tleSaveConfirm) {
+      this.tleSaveConfirm.addEventListener('click', async () => {
+        await this.handleSaveTLE();
+      });
+    }
+
+    // TLE 저장 취소 버튼 핸들러
+    if (this.tleSaveCancel) {
+      this.tleSaveCancel.addEventListener('click', () => {
+        this.hideTLESaveDialog();
       });
     }
 
@@ -1111,6 +1177,177 @@ export class SatelliteUIManager {
       if (this.moveToMissionLocationTLEButton) {
         this.moveToMissionLocationTLEButton.disabled = false;
       }
+    }
+  }
+
+  /**
+   * TLE 목록 불러오기
+   */
+  private async loadTLEList(): Promise<void> {
+    if (!this.tleList) {
+      return;
+    }
+
+    try {
+      const response = await getTLEList();
+      
+      // 기존 옵션 제거 (첫 번째 옵션 제외)
+      while (this.tleList.options.length > 1) {
+        this.tleList.remove(1);
+      }
+
+      // TLE 목록 추가
+      response.tles.forEach((tle: TleResponse) => {
+        const option = document.createElement('option');
+        option.value = tle.id;
+        option.textContent = `${tle.name}${tle.description ? ` - ${tle.description}` : ''}`;
+        this.tleList!.appendChild(option);
+      });
+    } catch (error: any) {
+      console.error('[SatelliteUIManager] TLE 목록 불러오기 실패:', error);
+    }
+  }
+
+  /**
+   * TLE 저장 다이얼로그 표시
+   */
+  private showTLESaveDialog(): void {
+    if (!this.tleSaveDialog || !this.tleInputText) {
+      return;
+    }
+
+    const tleText = this.tleInputText.value.trim();
+    if (!tleText) {
+      alert('TLE 데이터를 먼저 입력하세요.');
+      return;
+    }
+
+    // TLE 유효성 검사
+    try {
+      const testTime = Cesium.JulianDate.now();
+      const tempManager = new SatelliteManager(tleText);
+      const testPosition = tempManager.calculatePosition(testTime);
+      
+      if (!testPosition) {
+        alert('TLE 데이터가 올바르지 않습니다.');
+        return;
+      }
+    } catch (error: any) {
+      alert('TLE 데이터가 올바르지 않습니다: ' + error.message);
+      return;
+    }
+
+    // 다이얼로그 표시 및 초기화
+    this.tleSaveDialog.style.display = 'block';
+    if (this.tleSaveName) {
+      this.tleSaveName.value = '';
+    }
+    if (this.tleSaveDescription) {
+      this.tleSaveDescription.value = '';
+    }
+  }
+
+  /**
+   * TLE 저장 다이얼로그 숨기기
+   */
+  private hideTLESaveDialog(): void {
+    if (this.tleSaveDialog) {
+      this.tleSaveDialog.style.display = 'none';
+    }
+  }
+
+  /**
+   * TLE 저장 처리
+   */
+  private async handleSaveTLE(): Promise<void> {
+    if (!this.tleInputText || !this.tleSaveName) {
+      return;
+    }
+
+    const tleText = this.tleInputText.value.trim();
+    const name = this.tleSaveName.value.trim();
+    const description = this.tleSaveDescription?.value.trim() || undefined;
+
+    if (!tleText) {
+      alert('TLE 데이터를 입력하세요.');
+      return;
+    }
+
+    if (!name) {
+      alert('TLE 이름을 입력하세요.');
+      return;
+    }
+
+    try {
+      await saveTLE(name, description, tleText);
+      alert('TLE가 저장되었습니다.');
+      this.hideTLESaveDialog();
+      await this.loadTLEList();
+    } catch (error: any) {
+      alert('TLE 저장 실패: ' + (error.message || '알 수 없는 오류'));
+      console.error('[SatelliteUIManager] TLE 저장 실패:', error);
+    }
+  }
+
+  /**
+   * TLE 불러오기 처리
+   */
+  private async handleLoadTLE(): Promise<void> {
+    if (!this.tleList || !this.tleInputText) {
+      return;
+    }
+
+    const selectedId = this.tleList.value;
+    if (!selectedId) {
+      alert('불러올 TLE를 선택하세요.');
+      return;
+    }
+
+    try {
+      const tle = await getTLE(selectedId);
+      this.tleInputText.value = tle.tle_data;
+      
+      // TLE 적용
+      this.handleApplyTLE();
+      
+      alert(`TLE "${tle.name}"을(를) 불러왔습니다.`);
+    } catch (error: any) {
+      alert('TLE 불러오기 실패: ' + (error.message || '알 수 없는 오류'));
+      console.error('[SatelliteUIManager] TLE 불러오기 실패:', error);
+    }
+  }
+
+  /**
+   * TLE 삭제 처리
+   */
+  private async handleDeleteTLE(): Promise<void> {
+    if (!this.tleList) {
+      return;
+    }
+
+    const selectedId = this.tleList.value;
+    if (!selectedId) {
+      alert('삭제할 TLE를 선택하세요.');
+      return;
+    }
+
+    const selectedOption = this.tleList.options[this.tleList.selectedIndex];
+    const tleName = selectedOption.textContent;
+
+    if (!confirm(`TLE "${tleName}"을(를) 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      await deleteTLE(selectedId);
+      alert('TLE가 삭제되었습니다.');
+      await this.loadTLEList();
+      
+      // 선택 초기화
+      this.tleList.value = '';
+    } catch (error: any) {
+      alert('TLE 삭제 실패: ' + (error.message || '알 수 없는 오류'));
+      console.error('[SatelliteUIManager] TLE 삭제 실패:', error);
     }
   }
 }
