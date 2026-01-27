@@ -4,8 +4,8 @@
 API 응답을 위한 Pydantic 스키마입니다.
 """
 
-from pydantic import BaseModel, Field
-from typing import List, Optional
+from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Dict, Any
 
 
 class ChirpResponse(BaseModel):
@@ -76,3 +76,51 @@ class SarImageBothResponse(BaseModel):
     message: str = Field(..., description="응답 메시지")
     target_region: dict = Field(..., description="타겟 영역 SAR 이미지")
     full_swath: dict = Field(..., description="전체 영역 SAR 이미지")
+
+
+class SatelliteCreateResponse(BaseModel):
+    """위성 생성 응답 스키마"""
+    
+    success: bool = Field(..., description="성공 여부")
+    message: str = Field(..., description="응답 메시지")
+    satellite_state: dict = Field(..., description="위성 상태 (ECEF 좌표)")
+    mission_direction: dict = Field(..., description="미션 방향 정보")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "success": True,
+                "message": "위성 생성 완료",
+                "satellite_state": {
+                    "position": [6378137.0 + 517000.0, 0.0, 0.0],
+                    "velocity": [0.0, 7266.0, 0.0]
+                },
+                "mission_direction": {
+                    "beam_direction": [0.0, 0.0, -1.0],
+                    "heading": 0.0
+                }
+            }
+        }
+    )
+
+
+class MissionDirectionResponse(BaseModel):
+    """미션 방향 계산 응답 스키마"""
+    
+    success: bool = Field(..., description="성공 여부")
+    message: str = Field(..., description="응답 메시지")
+    beam_direction: List[float] = Field(..., description="빔 방향 벡터 (ECEF 좌표, 정규화된 벡터)", min_length=3, max_length=3)
+    heading: float = Field(..., description="Heading 각도 (단위: deg, 0-360)")
+    crossing_point: Optional[List[float]] = Field(None, description="빔과 지구 교차점 (지리 좌표: [경도, 위도, 고도])")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "success": True,
+                "message": "미션 방향 계산 완료",
+                "beam_direction": [0.0, 0.0, -1.0],
+                "heading": 0.0,
+                "crossing_point": [128.1, 37.1, 0.0]
+            }
+        }
+    )

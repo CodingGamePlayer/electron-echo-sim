@@ -25,35 +25,95 @@
       <div class="tab-container">
         <!-- 탭 버튼 -->
         <div class="tab-buttons">
-          <button class="tab-button active" data-tab="tle">TLE 입력</button>
+          <button class="tab-button active" data-tab="satellite">위성 생성</button>
           <button class="tab-button" data-tab="sar-config">SAR 설정</button>
           <button class="tab-button" data-tab="swath">SAR Swath</button>
         </div>
 
-        <!-- TLE 입력 탭 -->
-        <div id="tleTab" class="tab-content active">
+        <!-- 위성 생성 탭 -->
+        <div id="satelliteTab" class="tab-content active">
           <div class="sidebar-section">
-            <h3>TLE 입력</h3>
-            <label>
-              <input type="checkbox" id="useTLE"> TLE 사용
+            <h3>위성 생성</h3>
+            
+            <!-- 생성 모드 선택 -->
+            <label style="margin-bottom: 15px;">
+              생성 모드:
+              <select id="satelliteMode" style="width: 100%;">
+                <option value="position_velocity">위치/속도 기반</option>
+                <option value="tle">TLE 기반</option>
+              </select>
             </label>
-            <label>
-              TLE 데이터:
-              <textarea id="tleInput" placeholder="TLE 데이터를 입력하세요 (2줄 또는 3줄)&#10;예시:&#10;ISS (ZARYA)&#10;1 25544U 98067A   24123.45678901  .00001234  00000+0  12345-4 0  9999&#10;2 25544  51.6442 123.4567 0001234 234.5678 123.4567 15.12345678901234"></textarea>
-            </label>
-            <button id="applyTLE">TLE 적용</button>
-            <label style="margin-top: 15px;">
-              위성 고도 (km):
-              <input type="number" id="satelliteAltitude" value="0" step="0.1" min="0" max="10000">
-              <div class="info">TLE 적용 시 자동으로 계산된 고도가 표시됩니다. 필요시 수정할 수 있습니다.</div>
-            </label>
+
+            <!-- 위치/속도 기반 입력 -->
+            <div id="positionVelocityInput" class="satellite-input-section">
+              <h4 style="margin-top: 15px; margin-bottom: 10px;">미션 위치</h4>
+              <label>
+                경도 (deg):
+                <input type="number" id="missionLongitude" value="128.0" step="0.0001" min="-180" max="180">
+              </label>
+              <label>
+                위도 (deg):
+                <input type="number" id="missionLatitude" value="37.0" step="0.0001" min="-90" max="90">
+              </label>
+              <div class="info" style="margin-top: 5px; margin-bottom: 10px; font-size: 12px; color: #aaa;">
+                미션 위치를 입력하면 위성 위치와 속도가 자동으로 계산됩니다.
+              </div>
+
+              <h4 style="margin-top: 15px; margin-bottom: 10px;">위성 위치 (자동 계산됨)</h4>
+              <label>
+                경도 (deg):
+                <input type="number" id="satelliteLongitude" value="128.0" step="0.0001" min="-180" max="180" readonly>
+              </label>
+              <label>
+                위도 (deg):
+                <input type="number" id="satelliteLatitude" value="37.0" step="0.0001" min="-90" max="90" readonly>
+              </label>
+              <label>
+                고도 (m):
+                <input type="number" id="satelliteAltitude" value="517000" step="1000" min="0" max="1000000">
+              </label>
+
+              <h4 style="margin-top: 15px; margin-bottom: 10px;">위성 속도 (ECEF 좌표, 자동 계산됨)</h4>
+              <label>
+                Vx (m/s):
+                <input type="number" id="satelliteVx" value="0" step="1" min="-10000" max="10000" readonly>
+              </label>
+              <label>
+                Vy (m/s):
+                <input type="number" id="satelliteVy" value="7266" step="1" min="-10000" max="10000" readonly>
+              </label>
+              <label>
+                Vz (m/s):
+                <input type="number" id="satelliteVz" value="0" step="1" min="-10000" max="10000" readonly>
+              </label>
+
+              <button id="createSatellite" class="sidebar-section button" style="width: 100%; margin-top: 15px;">위성 생성 및 미션 방향 계산</button>
+              <div id="satelliteCreationStatus" style="margin-top: 10px; padding: 8px; background: rgba(0, 0, 0, 0.3); border-radius: 3px; display: none;"></div>
+            </div>
+
+            <!-- TLE 기반 입력 -->
+            <div id="tleInput" class="satellite-input-section" style="display: none;">
+              <label>
+                <input type="checkbox" id="useTLE"> TLE 사용
+              </label>
+              <label>
+                TLE 데이터:
+                <textarea id="tleInputText" placeholder="TLE 데이터를 입력하세요 (2줄 또는 3줄)&#10;예시:&#10;ISS (ZARYA)&#10;1 25544U 98067A   24123.45678901  .00001234  00000+0  12345-4 0  9999&#10;2 25544  51.6442 123.4567 0001234 234.5678 123.4567 15.12345678901234"></textarea>
+              </label>
+              <button id="applyTLE">TLE 적용</button>
+              <label style="margin-top: 15px;">
+                위성 고도 (km):
+                <input type="number" id="satelliteAltitudeTLE" value="0" step="0.1" min="0" max="10000">
+                <div class="info">TLE 적용 시 자동으로 계산된 고도가 표시됩니다. 필요시 수정할 수 있습니다.</div>
+              </label>
+            </div>
           </div>
 
           <!-- 위성 자세 제어 섹션 -->
           <div class="sidebar-section" style="margin-top: 20px;">
             <h3>위성 자세 제어</h3>
             <label style="margin-bottom: 15px;">
-              <input type="checkbox" id="useCustomOrientation" checked> 커스텀 방향 사용
+              <input type="checkbox" id="useCustomOrientation"> 커스텀 방향 사용
               <div class="info">체크하면 Yaw, Pitch, Roll을 수동으로 제어할 수 있습니다.</div>
             </label>
 
@@ -458,6 +518,24 @@
         }
       });
     });
+
+    // 위성 생성 모드 전환
+    const satelliteModeSelect = document.getElementById('satelliteMode');
+    const positionVelocityInput = document.getElementById('positionVelocityInput');
+    const tleInput = document.getElementById('tleInput');
+    
+    if (satelliteModeSelect && positionVelocityInput && tleInput) {
+      satelliteModeSelect.addEventListener('change', () => {
+        const mode = satelliteModeSelect.value;
+        if (mode === 'position_velocity') {
+          positionVelocityInput.style.display = 'block';
+          tleInput.style.display = 'none';
+        } else {
+          positionVelocityInput.style.display = 'none';
+          tleInput.style.display = 'block';
+        }
+      });
+    }
   </script>
 </body>
 </html>

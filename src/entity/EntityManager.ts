@@ -25,6 +25,7 @@ export class EntityManager {
   private swathPreviewManager: SwathPreviewManager;
   private headingOffset: number;
   private customAltitude: number | null;  // null이면 TLE 고도 사용, 값이 있으면 해당 고도 사용
+  private missionLocationEntity: any | null;  // 미션 위치 마커 엔티티
 
   constructor(viewer: any, satelliteManager: SatelliteManager) {
     this.viewer = viewer;
@@ -33,6 +34,7 @@ export class EntityManager {
     this.swathGroupManager = new SwathGroupManager(this.swathManager);
     this.headingOffset = 0;
     this.customAltitude = null;
+    this.missionLocationEntity = null;
 
     this.satelliteEntityManager = new SatelliteEntityManager(viewer, satelliteManager);
     this.positionUpdateManager = new PositionUpdateManager(viewer, satelliteManager, this.satelliteEntityManager);
@@ -419,5 +421,175 @@ export class EntityManager {
    */
   getSatelliteEntityManager(): SatelliteEntityManager {
     return this.satelliteEntityManager;
+  }
+
+  /**
+   * 미션 방향 설정
+   * @param missionDirection 미션 방향 정보 (beam_direction, heading, crossing_point)
+   */
+  setMissionDirection(missionDirection: {
+    beam_direction: [number, number, number];
+    heading: number;
+    crossing_point?: [number, number, number] | null;
+  }): void {
+    // 빔 방향 벡터를 위성의 방향으로 설정
+    const beamDirectionEcef = new Cesium.Cartesian3(
+      missionDirection.beam_direction[0],
+      missionDirection.beam_direction[1],
+      missionDirection.beam_direction[2]
+    );
+    
+    // 위성의 로컬 좌표계 계산
+    const currentCartesian = this.satelliteEntityManager.getCurrentCartesian();
+    if (!currentCartesian) {
+      console.warn('[EntityManager] 위성 위치가 없어 미션 방향을 설정할 수 없습니다.');
+      return;
+    }
+    
+    // 위성의 기본 축 계산
+    const axes = this.satelliteEntityManager.calculateBaseAxes();
+    if (!axes) {
+      console.warn('[EntityManager] 위성 축을 계산할 수 없어 미션 방향을 설정할 수 없습니다.');
+      return;
+    }
+    
+    // 빔 방향 벡터를 로컬 좌표계로 변환
+    // 로컬 좌표계: X(진행 방향), Y(관측 방향), Z(지구 중심)
+    const beamDirectionNormalized = Cesium.Cartesian3.normalize(beamDirectionEcef, new Cesium.Cartesian3());
+    
+    // 로컬 좌표계에서 빔 방향의 성분 (내적 계산)
+    const localX = beamDirectionNormalized.x * axes.xAxis.x + beamDirectionNormalized.y * axes.xAxis.y + beamDirectionNormalized.z * axes.xAxis.z;
+    const localY = beamDirectionNormalized.x * axes.yAxis.x + beamDirectionNormalized.y * axes.yAxis.y + beamDirectionNormalized.z * axes.yAxis.z;
+    const localZ = beamDirectionNormalized.x * axes.zAxis.x + beamDirectionNormalized.y * axes.zAxis.y + beamDirectionNormalized.z * axes.zAxis.z;
+    
+    // Y축이 빔 방향을 향하도록 회전
+    // 회전 순서: ZYX (Yaw-Pitch-Roll)
+    // 목표: Y축이 빔 방향 벡터 [localX, localY, localZ]를 향하도록
+    
+    // Yaw: Z축 기준 회전 (X-Y 평면에서)
+    // 현재 Y축: [0, 1, 0]
+    // 빔 방향의 X-Y 투영: [localX, localY, 0]
+    // Y축이 빔 방향의 X-Y 투영을 향하도록: atan2(localX, localY)
+    let yaw = 0;
+    const xyMagnitude = Math.sqrt(localX * localX + localY * localY);
+    if (xyMagnitude > 1e-6) {
+      yaw = Math.atan2(localX, localY);
+    }
+    
+    // Pitch: Y축 기준 회전 (Yaw 회전 후의 Y축을 기준으로)
+    // Yaw 회전 후의 Y축: [sin(yaw), cos(yaw), 0]
+    // 빔 방향: [localX, localY, localZ]
+    // Yaw 회전 후의 Y축이 빔 방향을 향하도록 하는 각도
+    // 빔 방향의 크기: sqrt(localX^2 + localY^2 + localZ^2) = 1 (정규화됨)
+    // Yaw 회전 후의 Y축과 빔 방향 사이의 각도
+    let pitch = 0;
+    const yzMagnitude = Math.sqrt(localY * localY + localZ * localZ);
+    if (yzMagnitude > 1e-6) {
+      // Yaw 회전 후의 Y축: [sin(yaw), cos(yaw), 0]
+      // 빔 방향: [localX, localY, localZ]
+      // Yaw 회전 후의 Y축을 Y-Z 평면으로 투영: [0, cos(yaw), 0]
+      // 빔 방향의 Y-Z 투영: [0, localY, localZ]
+      // 두 벡터 사이의 각도
+      // Yaw 회전 후의 Y축이 빔 방향의 Y-Z 투영을 향하도록 하는 각도
+      pitch = Math.atan2(-localZ, localY);
+    }
+    
+    // Roll은 기본값 유지 (X축 회전은 보통 안테나 tilt에 사용)
+    const roll = 0;
+    
+    // 각도를 도(degree)로 변환
+    const pitchDeg = Cesium.Math.toDegrees(pitch);
+    const yawDeg = Cesium.Math.toDegrees(yaw);
+    
+    // 위성 방향 값만 설정 (커스텀 방향 플래그는 변경하지 않음)
+    // 사용자가 명시적으로 커스텀 방향을 활성화하지 않는 한 VelocityOrientationProperty 사용
+    this.satelliteEntityManager.setOrientationValues(yawDeg, pitchDeg, roll);
+    
+    console.log(`[EntityManager] 미션 방향 설정 완료 - Roll: ${roll.toFixed(2)}°, Pitch: ${pitchDeg.toFixed(2)}°, Yaw: ${yawDeg.toFixed(2)}°`);
+    console.log(`[EntityManager] 로컬 좌표계 빔 방향: X=${localX.toFixed(3)}, Y=${localY.toFixed(3)}, Z=${localZ.toFixed(3)}`);
+    
+    // Heading 오프셋도 설정 (Swath 계산용)
+    const currentHeading = this.headingCalculator.getSatellitePosition(
+      currentCartesian,
+      this.headingOffset
+    )?.heading || 0;
+    
+    const headingDiff = missionDirection.heading - currentHeading;
+    this.setHeadingOffset(this.headingOffset + headingDiff);
+    
+    console.log(`[EntityManager] Heading: ${missionDirection.heading.toFixed(2)}°, Beam Direction: [${missionDirection.beam_direction.map(v => v.toFixed(3)).join(', ')}]`);
+    
+    if (missionDirection.crossing_point) {
+      console.log(`[EntityManager] 교차점: 경도 ${missionDirection.crossing_point[0].toFixed(4)}°, 위도 ${missionDirection.crossing_point[1].toFixed(4)}°, 고도 ${missionDirection.crossing_point[2].toFixed(0)}m`);
+    }
+  }
+
+  /**
+   * 미션 위치 마커 설정
+   * @param missionLocation 미션 위치 (longitude, latitude)
+   */
+  setMissionLocation(missionLocation: { longitude: number; latitude: number }): void {
+    // 기존 미션 위치 마커 제거
+    if (this.missionLocationEntity) {
+      this.viewer.entities.remove(this.missionLocationEntity);
+      this.missionLocationEntity = null;
+    }
+
+    // 새로운 미션 위치 마커 추가
+    this.missionLocationEntity = this.viewer.entities.add({
+      name: 'Mission Location',
+      position: Cesium.Cartesian3.fromDegrees(
+        missionLocation.longitude,
+        missionLocation.latitude,
+        0
+      ),
+      point: {
+        pixelSize: 20,
+        color: Cesium.Color.RED,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 3,
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(1.5e7, 1.0, 2.0e7, 0.5),
+        translucencyByDistance: new Cesium.NearFarScalar(1.5e7, 1.0, 2.0e7, 1.0),
+      },
+      label: {
+        text: '미션 위치',
+        font: '16px sans-serif',
+        fillColor: Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -30),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        show: true,
+      },
+      billboard: {
+        image: 'data:image/svg+xml;base64,' + btoa(`
+          <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="12" fill="#FF0000" stroke="#FFFFFF" stroke-width="2"/>
+            <circle cx="16" cy="16" r="6" fill="#FFFFFF"/>
+          </svg>
+        `),
+        scale: 1.0,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        show: true,
+      },
+    });
+
+    console.log(`[EntityManager] 미션 위치 마커 추가: 경도 ${missionLocation.longitude.toFixed(4)}°, 위도 ${missionLocation.latitude.toFixed(4)}°`);
+  }
+
+  /**
+   * 미션 위치 마커 제거
+   */
+  removeMissionLocation(): void {
+    if (this.missionLocationEntity) {
+      this.viewer.entities.remove(this.missionLocationEntity);
+      this.missionLocationEntity = null;
+      console.log('[EntityManager] 미션 위치 마커 제거');
+    }
   }
 }

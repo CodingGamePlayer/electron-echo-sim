@@ -99,3 +99,41 @@ class SarImageProcessRequest(BaseModel):
             }
         }
     )
+
+
+class SatelliteCreateRequest(BaseModel):
+    """위성 생성 요청 스키마"""
+    
+    position: List[float] = Field(..., description="위성 위치 (지리 좌표: [경도, 위도, 고도], 단위: [deg, deg, m])", min_length=3, max_length=3)
+    velocity: List[float] = Field(..., description="위성 속도 벡터 (ECEF 좌표: [vx, vy, vz], 단위: m/s)", min_length=3, max_length=3)
+    mission_location: List[float] = Field(..., description="미션 위치 (지리 좌표: [경도, 위도], 단위: [deg, deg])", min_length=2, max_length=2)
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "position": [128.0, 37.0, 517000.0],
+                "velocity": [0.0, 7266.0, 0.0],
+                "mission_location": [128.1, 37.1]
+            }
+        }
+    )
+
+
+class MissionDirectionRequest(BaseModel):
+    """미션 방향 계산 요청 스키마"""
+    
+    satellite_state: SatelliteState = Field(..., description="위성 상태")
+    mission_location: List[float] = Field(..., description="미션 위치 (지리 좌표: [경도, 위도], 단위: [deg, deg])", min_length=2, max_length=2)
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "satellite_state": {
+                    "position": [6378137.0 + 517000.0, 0.0, 0.0],
+                    "velocity": [0.0, 7266.0, 0.0],
+                    "beam_direction": None
+                },
+                "mission_location": [128.1, 37.1]
+            }
+        }
+    )

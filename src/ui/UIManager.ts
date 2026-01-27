@@ -1,7 +1,7 @@
 import { SatelliteManager } from '../satellite/SatelliteManager.js';
 import { EntityManager } from '../entity/EntityManager.js';
 import { CesiumViewerManager } from '../cesium/CesiumViewerManager.js';
-import { TLEUIManager } from './TLEUIManager.js';
+import { SatelliteUIManager } from './SatelliteUIManager.js';
 import { SwathControlUIManager } from './SwathControlUIManager.js';
 import { SwathGroupsUIManager } from './SwathGroupsUIManager.js';
 import { SarConfigUIManager } from './SarConfigUIManager.js';
@@ -16,7 +16,7 @@ export class UIManager {
   private entityManager: EntityManager;
   private viewer: any;
   private viewerManager: CesiumViewerManager | null;
-  private tleUIManager: TLEUIManager;
+  private satelliteUIManager: SatelliteUIManager;
   private swathControlUIManager: SwathControlUIManager;
   private swathGroupsUIManager: SwathGroupsUIManager;
   private sarConfigUIManager: SarConfigUIManager;
@@ -29,7 +29,7 @@ export class UIManager {
     this.viewer = viewer;
     this.viewerManager = viewerManager || null;
     
-    this.tleUIManager = new TLEUIManager(satelliteManager, entityManager);
+    this.satelliteUIManager = new SatelliteUIManager(satelliteManager, entityManager);
     this.sarConfigUIManager = new SarConfigUIManager();
     this.swathControlUIManager = new SwathControlUIManager(
       entityManager,
@@ -52,7 +52,7 @@ export class UIManager {
    * UI 초기화
    */
   initialize(defaultTLE: string): void {
-    this.tleUIManager.initialize(defaultTLE);
+    this.satelliteUIManager.initialize(defaultTLE);
     this.swathControlUIManager.initialize(() => {
       this.swathGroupsUIManager.updateSwathGroupsList();
       const selectedGroupId = this.swathGroupsUIManager.getSelectedGroupId();

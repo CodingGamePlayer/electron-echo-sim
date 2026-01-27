@@ -32,7 +32,7 @@ export class SatelliteEntityManager {
     this.yaw = 0;
     this.pitch = 0;
     this.roll = 47;  // 기본 roll 47도
-    this.useCustomOrientation = true;  // 기본으로 커스텀 방향 사용
+    this.useCustomOrientation = false;  // 기본으로 커스텀 방향 사용 안 함
   }
 
   /**
@@ -534,12 +534,54 @@ export class SatelliteEntityManager {
   }
 
   /**
+   * Roll 설정
+   */
+  setRoll(roll: number): void {
+    this.roll = roll;
+    this.useCustomOrientation = true;
+    this.updateOrientationProperty();
+  }
+
+  /**
+   * Pitch 설정
+   */
+  setPitch(pitch: number): void {
+    this.pitch = pitch;
+    this.useCustomOrientation = true;
+    this.updateOrientationProperty();
+  }
+
+  /**
+   * Yaw 설정
+   */
+  setYaw(yaw: number): void {
+    this.yaw = yaw;
+    this.useCustomOrientation = true;
+    this.updateOrientationProperty();
+  }
+
+  /**
+   * 방향 값만 설정 (커스텀 방향 플래그는 변경하지 않음)
+   * 미션 방향 설정 시 사용
+   */
+  setOrientationValues(yaw: number, pitch: number, roll: number): void {
+    this.yaw = yaw;
+    this.pitch = pitch;
+    this.roll = roll;
+    // useCustomOrientation 플래그는 변경하지 않음
+    // 이미 커스텀 방향이 활성화되어 있으면 방향만 업데이트됨
+    if (this.useCustomOrientation) {
+      this.updateOrientationProperty();
+    }
+  }
+
+  /**
    * 위성의 로컬 좌표계 기본 축 계산 (회전 적용 전)
    * X: 위성 진행 방향 (속도 벡터)
    * Z: 지구 중심 방향
    * Y: SAR 관측 방향 (X × Z)
    */
-  private calculateBaseAxes(): { xAxis: any; yAxis: any; zAxis: any } | null {
+  calculateBaseAxes(): { xAxis: any; yAxis: any; zAxis: any } | null {
     if (!this.currentCartesian || !this.viewer) {
       return null;
     }
@@ -584,6 +626,26 @@ export class SatelliteEntityManager {
         }
       } catch (error) {
         console.warn('속도 계산 실패, 기본값 사용:', error);
+        xAxis = this.getDefaultVelocityDirection();
+      }
+    } else if (this.satelliteManager && this.satelliteManager.satelliteMode === 'position_velocity') {
+      // 위치/속도 기반 모드: 저장된 속도 벡터 사용
+      const state = this.satelliteManager.getPositionVelocityState();
+      if (state && state.velocity) {
+        // 속도 벡터를 ECEF 좌표계로 변환 (이미 ECEF일 수 있음)
+        xAxis = new Cesium.Cartesian3(
+          state.velocity.vx,
+          state.velocity.vy,
+          state.velocity.vz
+        );
+        // 속도 벡터 정규화
+        const speed = Math.sqrt(xAxis.x * xAxis.x + xAxis.y * xAxis.y + xAxis.z * xAxis.z);
+        if (speed > 1e-6) {
+          xAxis = Cesium.Cartesian3.normalize(xAxis, new Cesium.Cartesian3());
+        } else {
+          xAxis = this.getDefaultVelocityDirection();
+        }
+      } else {
         xAxis = this.getDefaultVelocityDirection();
       }
     } else {

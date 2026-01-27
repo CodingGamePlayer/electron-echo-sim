@@ -6,7 +6,7 @@ FastAPI 기반 REST API 서버의 진입점입니다.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import config, chirp, echo, raw_data, sar_image
+from api.routes import config, chirp, echo, raw_data, sar_image, satellite
 from api.database import init_db
 
 # FastAPI 앱 생성
@@ -39,6 +39,7 @@ app.include_router(chirp.router, prefix="/api/chirp", tags=["Chirp"])
 app.include_router(echo.router, prefix="/api/echo", tags=["Echo"])
 app.include_router(raw_data.router, prefix="/api/raw-data", tags=["Raw Data"])
 app.include_router(sar_image.router, prefix="/api/sar-image", tags=["SAR Image"])
+app.include_router(satellite.router, prefix="/api/satellite", tags=["Satellite"])
 
 
 @app.get("/api/health", tags=["Health"])

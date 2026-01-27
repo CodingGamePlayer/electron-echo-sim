@@ -576,6 +576,13 @@ html, body, #cesiumContainer {
   margin-top: 4px;
 }
 
+/* readonly 필드 스타일 - 약간 더 어두운 배경으로 구분 */
+.sidebar-section input[readonly] {
+  background: rgba(0, 0, 0, 0.7);
+  color: #ccc;
+  cursor: not-allowed;
+}
+
 .sidebar-section textarea {
   resize: vertical;
   font-family: monospace;
