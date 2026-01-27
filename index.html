@@ -106,6 +106,23 @@
                 <input type="number" id="satelliteAltitudeTLE" value="0" step="0.1" min="0" max="10000">
                 <div class="info">TLE 적용 시 자동으로 계산된 고도가 표시됩니다. 필요시 수정할 수 있습니다.</div>
               </label>
+              
+              <h4 style="margin-top: 15px; margin-bottom: 10px;">미션 위치 (TLE 기반)</h4>
+              <label>
+                경도 (deg):
+                <input type="number" id="missionLongitudeTLE" value="128.0" step="0.0001" min="-180" max="180">
+              </label>
+              <label>
+                위도 (deg):
+                <input type="number" id="missionLatitudeTLE" value="37.0" step="0.0001" min="-90" max="90">
+              </label>
+              <label>
+                시간 오프셋 (분):
+                <input type="number" id="missionTimeOffsetTLE" value="5" step="1" min="-60" max="60">
+                <div class="info">미션 위치를 지나가기 전 N분 위치로 위성을 이동합니다. 양수는 과거, 음수는 미래입니다.</div>
+              </label>
+              <button id="moveToMissionLocationTLE" class="sidebar-section button" style="width: 100%; margin-top: 10px;">미션 위치로 위성 이동</button>
+              <div id="tleMissionStatus" style="margin-top: 10px; padding: 8px; background: rgba(0, 0, 0, 0.3); border-radius: 3px; display: none;"></div>
             </div>
           </div>
 

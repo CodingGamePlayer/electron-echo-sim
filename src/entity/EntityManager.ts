@@ -424,6 +424,17 @@ export class EntityManager {
   }
 
   /**
+   * Cesium 시계 시간 설정
+   * @param time 설정할 시간 (JulianDate)
+   */
+  setClockTime(time: any): void {
+    if (this.viewer && this.viewer.clock) {
+      this.viewer.clock.currentTime = time.clone();
+      console.log(`[EntityManager] 시계 시간 설정: ${Cesium.JulianDate.toDate(time).toISOString()}`);
+    }
+  }
+
+  /**
    * 미션 방향 설정
    * @param missionDirection 미션 방향 정보 (beam_direction, heading, crossing_point)
    */
