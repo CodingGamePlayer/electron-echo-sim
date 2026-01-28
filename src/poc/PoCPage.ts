@@ -4,9 +4,9 @@ import { EntityManager } from './entity/EntityManager.js';
 import { UIManager } from './ui/UIManager.js';
 
 /**
- * PoCApp - PoC 전용 애플리케이션 클래스
+ * PoCPage - PoC 전용 페이지 클래스
  */
-export class PoCApp {
+export class PoCPage {
   private viewerManager: CesiumViewerManager | null;
   private satelliteManager: SatelliteManager | null;
   private entityManager: EntityManager | null;
@@ -24,7 +24,7 @@ export class PoCApp {
   }
 
   /**
-   * PoC 애플리케이션 초기화
+   * PoC 페이지 초기화
    */
   async initialize(): Promise<void> {
     try {
@@ -65,11 +65,14 @@ export class PoCApp {
         this.entityManager?.drawPredictedPath(4);
       }, 1000); // 초기화 후 1초 뒤에 경로 그리기
 
-      // 7. UI 매니저 초기화
+      // 7. 사이드바 복원 (Prototype에서 변경된 경우)
+      this.restoreSidebar();
+
+      // 8. UI 매니저 초기화
       this.uiManager = new UIManager(this.satelliteManager, this.entityManager, viewer, this.viewerManager);
       this.uiManager.initialize(this.defaultTLE);
 
-      // 8. 카메라 설정
+      // 9. 카메라 설정
       this.viewerManager.setupCamera(
         Cesium.Cartesian3.fromDegrees(0, 0, 20000000),
         {
@@ -80,20 +83,57 @@ export class PoCApp {
       );
 
     } catch (error) {
-      console.error('[PoCApp] 초기화 오류:', error);
+      console.error('[PoCPage] 초기화 오류:', error);
     }
   }
 
   /**
-   * PoC 애플리케이션 정리
+   * 사이드바 복원
+   */
+  private restoreSidebar(): void {
+    const sidebarContent = document.getElementById('sidebarContent');
+    if (!sidebarContent || sidebarContent.innerHTML.trim() === '') {
+      // 사이드바가 비어있으면 페이지를 다시 로드하여 HTML 복원
+      console.log('[PoCPage] 사이드바가 비어있어 페이지를 다시 로드합니다.');
+      window.location.reload();
+      return;
+    }
+    
+    // 사이드바 헤더 제목 복원
+    const sidebarHeader = document.getElementById('sidebarHeader');
+    if (sidebarHeader) {
+      const title = sidebarHeader.querySelector('h2');
+      if (title) {
+        title.textContent = '제어 패널';
+      }
+    }
+  }
+
+  /**
+   * PoC 페이지 정리
    */
   cleanup(): void {
     // 리소스 정리
     if (this.entityManager) {
       this.entityManager.stopUpdateLoop();
     }
-    if (this.viewerManager) {
-      // Cesium 뷰어 정리 필요시 추가
+    
+    // Cesium 뷰어 정리
+    if (this.viewerManager && this.viewerManager.getViewer) {
+      const viewer = this.viewerManager.getViewer();
+      if (viewer && viewer.destroy) {
+        try {
+          viewer.destroy();
+        } catch (error) {
+          console.warn('[PoCPage] 뷰어 정리 중 오류:', error);
+        }
+      }
+    }
+    
+    // 컨테이너 정리
+    const container = document.getElementById('cesiumContainer');
+    if (container) {
+      container.innerHTML = '';
     }
   }
 }

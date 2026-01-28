@@ -408,14 +408,12 @@ html, body, #cesiumContainer {
 }
 
 #sidebarHeader {
-  padding: 10px 15px;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid #555;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+  display: none;
   transition: all 0.3s ease;
-  min-height: 50px;
+  min-height: 0;
   box-sizing: border-box;
 }
 

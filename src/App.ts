@@ -1,19 +1,19 @@
 import { Layout } from './Layout.js';
-import { PoCApp } from './poc/PoCApp.js';
-import { PrototypeApp } from './prototype/PrototypeApp.js';
+import { PoCPage } from './poc/PoCPage.js';
+import { PrototypePage } from './prototype/PrototypePage.js';
 
 /**
  * App - 메인 애플리케이션 클래스 (앱 라우터)
  */
 export class App {
   private layout: Layout | null;
-  private currentApp: PoCApp | PrototypeApp | null;
-  private currentAppType: 'poc' | 'prototype' | null;
+  private currentPage: PoCPage | PrototypePage | null;
+  private currentPageType: 'poc' | 'prototype' | null;
 
   constructor() {
     this.layout = null;
-    this.currentApp = null;
-    this.currentAppType = null;
+    this.currentPage = null;
+    this.currentPageType = null;
   }
 
   /**
@@ -28,8 +28,8 @@ export class App {
       // 2. 메뉴 클릭 이벤트 등록
       this.setupMenuHandlers();
 
-      // 3. 기본으로 PoC 앱 로드
-      await this.loadApp('poc');
+      // 3. 기본으로 PoC 페이지 로드
+      await this.loadPage('poc');
 
     } catch (error) {
       console.error('[App] 초기화 오류:', error);
@@ -44,48 +44,73 @@ export class App {
 
     // PoC 메뉴 클릭 핸들러
     this.layout.onMenuClick('poc', () => {
-      this.loadApp('poc');
+      this.loadPage('poc');
     });
 
     // Prototype 메뉴 클릭 핸들러
     this.layout.onMenuClick('prototype', () => {
-      this.loadApp('prototype');
+      this.loadPage('prototype');
     });
   }
 
   /**
-   * 앱 로드
+   * 페이지 로드
    */
-  private async loadApp(appType: 'poc' | 'prototype'): Promise<void> {
+  private async loadPage(pageType: 'poc' | 'prototype'): Promise<void> {
     try {
-      // 기존 앱 정리
-      if (this.currentApp) {
-        this.currentApp.cleanup();
-        this.currentApp = null;
+      // 기존 페이지 정리
+      if (this.currentPage) {
+        this.currentPage.cleanup();
+        this.currentPage = null;
       }
 
-      // 새 앱 생성 및 초기화
-      if (appType === 'poc') {
-        this.currentApp = new PoCApp();
-        this.currentAppType = 'poc';
-        await this.currentApp.initialize();
-      } else if (appType === 'prototype') {
-        this.currentApp = new PrototypeApp();
-        this.currentAppType = 'prototype';
-        await this.currentApp.initialize();
+      // 새 페이지 생성 및 초기화
+      if (pageType === 'poc') {
+        this.currentPage = new PoCPage();
+        this.currentPageType = 'poc';
+        await this.currentPage.initialize();
+        // 카메라 고정 버튼 표시
+        this.showCameraTrackButton();
+      } else if (pageType === 'prototype') {
+        this.currentPage = new PrototypePage();
+        this.currentPageType = 'prototype';
+        await this.currentPage.initialize();
+        // 카메라 고정 버튼 숨김
+        this.hideCameraTrackButton();
       }
 
-      console.log(`[App] ${appType} 앱 로드 완료`);
+      console.log(`[App] ${pageType} 페이지 로드 완료`);
 
     } catch (error) {
-      console.error(`[App] ${appType} 앱 로드 오류:`, error);
+      console.error(`[App] ${pageType} 페이지 로드 오류:`, error);
+    }
+  }
+
+
+  /**
+   * 현재 페이지 타입 가져오기
+   */
+  getCurrentPageType(): 'poc' | 'prototype' | null {
+    return this.currentPageType;
+  }
+
+  /**
+   * 카메라 고정 버튼 표시
+   */
+  private showCameraTrackButton(): void {
+    const button = document.getElementById('cameraTrackButton');
+    if (button) {
+      button.style.display = 'block';
     }
   }
 
   /**
-   * 현재 앱 타입 가져오기
+   * 카메라 고정 버튼 숨김
    */
-  getCurrentAppType(): 'poc' | 'prototype' | null {
-    return this.currentAppType;
+  private hideCameraTrackButton(): void {
+    const button = document.getElementById('cameraTrackButton');
+    if (button) {
+      button.style.display = 'none';
+    }
   }
 }
