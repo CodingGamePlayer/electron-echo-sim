@@ -19,7 +19,6 @@
   <div id="sidebar">
     <div id="sidebarHeader">
       <h2>제어 패널</h2>
-      <button id="sidebarToggle">◀</button>
     </div>
     <div id="sidebarContent">
       <div class="tab-container">
@@ -538,16 +537,6 @@
     // App 인스턴스 생성 및 초기화
     const app = new App();
     app.initialize();
-
-    // 사이드바 접기/펼치기 기능
-    const sidebar = document.getElementById('sidebar');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    if (sidebar && sidebarToggle) {
-      sidebarToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('collapsed');
-        sidebarToggle.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
-      });
-    }
 
     // 탭 전환 기능
     const tabButtons = document.querySelectorAll('.tab-button');

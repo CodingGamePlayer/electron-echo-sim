@@ -30,23 +30,27 @@ export class Layout {
     menuSidebar.id = 'menuSidebar';
     menuSidebar.className = 'menu-sidebar';
 
-    const menuItems = [
-      { id: 'menu-satellite', icon: '🛰️', label: '위성', page: 'satellite' },
-      { id: 'menu-sar-config', icon: '⚙️', label: 'SAR 설정', page: 'sar-config' },
-      { id: 'menu-swath', icon: '📡', label: 'Swath', page: 'swath' },
-    ];
+    // PoC 메뉴 항목
+    const pocMenuItem = document.createElement('div');
+    pocMenuItem.className = 'menu-item';
+    pocMenuItem.id = 'menu-poc';
+    pocMenuItem.setAttribute('data-page', 'poc');
+    pocMenuItem.innerHTML = `
+      <div class="menu-icon">🔬</div>
+      <div class="menu-label">PoC</div>
+    `;
+    menuSidebar.appendChild(pocMenuItem);
 
-    menuItems.forEach((item) => {
-      const menuItem = document.createElement('div');
-      menuItem.className = 'menu-item';
-      menuItem.id = item.id;
-      menuItem.setAttribute('data-page', item.page);
-      menuItem.innerHTML = `
-        <div class="menu-icon">${item.icon}</div>
-        <div class="menu-label">${item.label}</div>
-      `;
-      menuSidebar.appendChild(menuItem);
-    });
+    // Prototype 메뉴 항목
+    const prototypeMenuItem = document.createElement('div');
+    prototypeMenuItem.className = 'menu-item';
+    prototypeMenuItem.id = 'menu-prototype';
+    prototypeMenuItem.setAttribute('data-page', 'prototype');
+    prototypeMenuItem.innerHTML = `
+      <div class="menu-icon">🚀</div>
+      <div class="menu-label">Prototype</div>
+    `;
+    menuSidebar.appendChild(prototypeMenuItem);
 
     document.body.appendChild(menuSidebar);
     this.menuSidebar = menuSidebar;
@@ -79,9 +83,10 @@ export class Layout {
       });
     });
 
-    // 첫 번째 메뉴 항목을 기본 활성화
-    if (menuItems.length > 0) {
-      this.setActiveMenuItem(menuItems[0] as HTMLElement);
+    // 첫 번째 메뉴 항목(PoC)을 기본 활성화
+    const firstMenuItem = this.menuSidebar.querySelector('#menu-poc');
+    if (firstMenuItem) {
+      this.setActiveMenuItem(firstMenuItem as HTMLElement);
     }
   }
 
@@ -163,11 +168,30 @@ export class Layout {
         color: #ccc;
         font-weight: 500;
         line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 100%;
       }
 
       .menu-item.active .menu-label {
         color: #4CAF50;
         font-weight: bold;
+      }
+
+      /* 메뉴 그룹 */
+      .menu-group {
+        margin-bottom: 15px;
+      }
+
+      .menu-group-label {
+        font-size: 9px;
+        color: #888;
+        text-align: center;
+        padding: 8px 4px 4px 4px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
 
       /* 기존 사이드바 위치 조정 (메뉴 사이드바가 있을 때) */
