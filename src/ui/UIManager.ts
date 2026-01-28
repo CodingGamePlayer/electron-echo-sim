@@ -29,7 +29,7 @@ export class UIManager {
     this.viewer = viewer;
     this.viewerManager = viewerManager || null;
     
-    this.satelliteUIManager = new SatelliteUIManager(satelliteManager, entityManager);
+    this.satelliteUIManager = new SatelliteUIManager(satelliteManager, entityManager, viewerManager || null);
     this.sarConfigUIManager = new SarConfigUIManager();
     this.swathControlUIManager = new SwathControlUIManager(
       entityManager,
@@ -73,6 +73,9 @@ export class UIManager {
     
     // 카메라 추적 버튼 초기화
     this.initializeCameraTrackingButton();
+    
+    // 지도 클릭 이벤트 설정
+    this.setupMapClickHandler();
   }
 
   /**
@@ -117,5 +120,24 @@ export class UIManager {
    */
   getSarConfigUIManager(): SarConfigUIManager {
     return this.sarConfigUIManager;
+  }
+
+  /**
+   * 지도 클릭 이벤트 핸들러 설정
+   */
+  private setupMapClickHandler(): void {
+    if (!this.viewerManager) {
+      console.warn('[UIManager] ViewerManager가 없어 지도 클릭 이벤트를 설정할 수 없습니다.');
+      return;
+    }
+
+    this.viewerManager.setupMapClickHandler((longitude: number, latitude: number) => {
+      console.log('[UIManager] 지도 클릭 핸들러 호출:', longitude, latitude);
+      // 미션 위치 선택 모드가 활성화된 경우에만 처리
+      if (this.satelliteUIManager.isMissionLocationSelectionModeActive()) {
+        // 위성 생성 UI의 미션 위치로 설정
+        this.satelliteUIManager.setMissionLocationFromClick(longitude, latitude);
+      }
+    });
   }
 }

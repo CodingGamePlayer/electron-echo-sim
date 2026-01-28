@@ -100,4 +100,42 @@ export class CesiumViewerManager {
   getViewer(): any {
     return this.viewer;
   }
+
+  /**
+   * 지도 커서 스타일 설정
+   */
+  setCursorStyle(cursor: string): void {
+    if (!this.viewer) {
+      return;
+    }
+    if (this.viewer.canvas) {
+      this.viewer.canvas.style.cursor = cursor;
+    }
+  }
+
+  /**
+   * 지도 클릭 이벤트 핸들러 등록
+   */
+  setupMapClickHandler(callback: (longitude: number, latitude: number) => void): void {
+    if (!this.viewer) {
+      throw new Error('Viewer가 초기화되지 않았습니다.');
+    }
+
+    const handler = new Cesium.ScreenSpaceEventHandler(this.viewer.scene.canvas);
+    
+    handler.setInputAction((click: any) => {
+      const cartesian = this.viewer.camera.pickEllipsoid(click.position, this.viewer.scene.globe.ellipsoid);
+      
+      if (cartesian) {
+        const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+        const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+        const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+        
+        console.log('[CesiumViewerManager] 지도 클릭:', longitude, latitude);
+        callback(longitude, latitude);
+      } else {
+        console.log('[CesiumViewerManager] 클릭 위치에서 좌표를 계산할 수 없습니다.');
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+  }
 }

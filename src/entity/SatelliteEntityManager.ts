@@ -69,7 +69,7 @@ export class SatelliteEntityManager {
         translucencyByDistance: new Cesium.NearFarScalar(1.5e7, 1.0, 2.0e7, 1.0),
       },
       label: {
-        text: 'ISS',
+        text: 'Satellite',
         font: '14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
@@ -78,12 +78,12 @@ export class SatelliteEntityManager {
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         pixelOffset: new Cesium.Cartesian2(0, -40),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        show: true,
+        show: false,
       },
       path: {
         resolution: 1,
         material: new Cesium.PolylineGlowMaterialProperty({
-          glowPower: 0.2,
+          glowPower: 0.1,
           color: Cesium.Color.CYAN,
         }),
         width: 3,

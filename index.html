@@ -47,6 +47,7 @@
             <!-- 위치/속도 기반 입력 -->
             <div id="positionVelocityInput" class="satellite-input-section">
               <h4 style="margin-top: 15px; margin-bottom: 10px;">미션 위치</h4>
+              <button id="selectMissionLocationButton" class="sidebar-section button" style="width: 100%; margin-bottom: 10px;">지도에서 미션 위치 선택</button>
               <label>
                 경도 (deg):
                 <input type="number" id="missionLongitude" value="128.0" step="0.0001" min="-180" max="180">
@@ -117,6 +118,7 @@
                 <button id="applyTLE" class="sidebar-section button" style="flex: 1;">TLE 적용</button>
                 <button id="saveTLE" class="sidebar-section button" style="flex: 1;">저장</button>
               </div>
+              <button id="showFullOrbitButton" class="sidebar-section button" style="width: 100%; margin-top: 5px;">전체 궤도 보기</button>
               
               <div id="tleSaveDialog" style="display: none; margin-top: 10px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 3px;">
                 <label>
@@ -139,6 +141,7 @@
               </label>
               
               <h4 style="margin-top: 15px; margin-bottom: 10px;">미션 위치 (TLE 기반)</h4>
+              <button id="selectMissionLocationTLEButton" class="sidebar-section button" style="width: 100%; margin-bottom: 10px;">지도에서 미션 위치 선택</button>
               <label>
                 경도 (deg):
                 <input type="number" id="missionLongitudeTLE" value="128.0" step="0.0001" min="-180" max="180">

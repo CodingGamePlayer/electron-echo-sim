@@ -2,6 +2,7 @@ import { SatelliteManager, SatelliteMode } from '../satellite/SatelliteManager.j
 import { EntityManager } from '../entity/EntityManager.js';
 import { createSatellite } from '../utils/satellite-api-client.js';
 import { saveTLE, getTLEList, getTLE, deleteTLE, TleResponse } from '../utils/tle-api-client.js';
+import { TLEParser } from '../satellite/TLEParser.js';
 
 /**
  * 위성 생성 UI 관리
@@ -9,6 +10,7 @@ import { saveTLE, getTLEList, getTLE, deleteTLE, TleResponse } from '../utils/tl
 export class SatelliteUIManager {
   private satelliteManager: SatelliteManager;
   private entityManager: EntityManager;
+  private viewerManager: any = null;
   private satelliteModeSelect: HTMLSelectElement | null;
   private positionVelocityInput: HTMLElement | null;
   private tleInput: HTMLElement | null;
@@ -32,10 +34,17 @@ export class SatelliteUIManager {
   private tleSaveDescription: HTMLInputElement | null;
   private tleSaveConfirm: HTMLButtonElement | null;
   private tleSaveCancel: HTMLButtonElement | null;
+  private selectMissionLocationButton: HTMLButtonElement | null;
+  private selectMissionLocationTLEButton: HTMLButtonElement | null;
+  private isMissionLocationSelectionActive: boolean = false;
+  private showFullOrbitButton: HTMLButtonElement | null;
+  private tleParser: TLEParser;
 
-  constructor(satelliteManager: SatelliteManager, entityManager: EntityManager) {
+  constructor(satelliteManager: SatelliteManager, entityManager: EntityManager, viewerManager?: any) {
     this.satelliteManager = satelliteManager;
     this.entityManager = entityManager;
+    this.viewerManager = viewerManager || null;
+    this.tleParser = new TLEParser();
     this.satelliteModeSelect = null;
     this.positionVelocityInput = null;
     this.tleInput = null;
@@ -59,6 +68,11 @@ export class SatelliteUIManager {
     this.tleSaveDescription = null;
     this.tleSaveConfirm = null;
     this.tleSaveCancel = null;
+    this.selectMissionLocationButton = null;
+    this.selectMissionLocationTLEButton = null;
+    this.isMissionLocationSelectionActive = false;
+    this.showFullOrbitButton = null;
+    this.tleParser = new TLEParser();
   }
 
   /**
@@ -95,6 +109,13 @@ export class SatelliteUIManager {
     this.tleSaveDescription = document.getElementById('tleSaveDescription') as HTMLInputElement;
     this.tleSaveConfirm = document.getElementById('tleSaveConfirm') as HTMLButtonElement;
     this.tleSaveCancel = document.getElementById('tleSaveCancel') as HTMLButtonElement;
+    
+    // 미션 위치 선택 버튼
+    this.selectMissionLocationButton = document.getElementById('selectMissionLocationButton') as HTMLButtonElement;
+    this.selectMissionLocationTLEButton = document.getElementById('selectMissionLocationTLEButton') as HTMLButtonElement;
+    
+    // 전체 궤도 보기 버튼
+    this.showFullOrbitButton = document.getElementById('showFullOrbitButton') as HTMLButtonElement;
 
     if (this.tleInputText && defaultTLE) {
       this.tleInputText.value = defaultTLE;
@@ -272,6 +293,48 @@ export class SatelliteUIManager {
           this.entityManager.setCustomAltitude(altitudeM);
           this.updatePositionIfNeeded();
         }
+      });
+    }
+
+    // TLE 미션 위치 입력 핸들러 - 미션 위치 변경 시 마커 업데이트
+    if (this.missionLongitudeTLE && this.missionLatitudeTLE) {
+      const updateTLEMissionMarker = () => {
+        const missionLon = parseFloat(this.missionLongitudeTLE!.value);
+        const missionLat = parseFloat(this.missionLatitudeTLE!.value);
+        
+        if (!isNaN(missionLon) && !isNaN(missionLat)) {
+          // 미션 위치 마커 표시
+          this.entityManager.setMissionLocation({
+            longitude: missionLon,
+            latitude: missionLat
+          });
+        }
+      };
+      
+      this.missionLongitudeTLE.addEventListener('change', updateTLEMissionMarker);
+      this.missionLatitudeTLE.addEventListener('change', updateTLEMissionMarker);
+    }
+
+    // 미션 위치 선택 버튼 핸들러 (위치/속도 모드)
+    if (this.selectMissionLocationButton) {
+      this.selectMissionLocationButton.addEventListener('click', () => {
+        // 토글: 이미 활성화되어 있으면 비활성화, 아니면 활성화
+        this.toggleMissionLocationSelection(!this.isMissionLocationSelectionActive);
+      });
+    }
+
+    // 미션 위치 선택 버튼 핸들러 (TLE 모드)
+    if (this.selectMissionLocationTLEButton) {
+      this.selectMissionLocationTLEButton.addEventListener('click', () => {
+        // 토글: 이미 활성화되어 있으면 비활성화, 아니면 활성화
+        this.toggleMissionLocationSelection(!this.isMissionLocationSelectionActive);
+      });
+    }
+
+    // 전체 궤도 보기 버튼 핸들러
+    if (this.showFullOrbitButton) {
+      this.showFullOrbitButton.addEventListener('click', () => {
+        this.showFullOrbit();
       });
     }
   }
@@ -584,28 +647,200 @@ export class SatelliteUIManager {
     }
     
     // 위성 위치 계산:
-    // 위성은 미션 위치에서 look angle을 고려하여 배치됨
-    // 위성 위치 = 미션 위치 + (nadir 방향) * 고도 - (cross-track 방향) * offset
-    // offset = 고도 * tan(look_angle)
-    const offset = defaultAltitude * Math.tan(lookAngleRad);
+    // SAR swath 중심에 미션 위치가 오도록 위성 위치를 계산
+    // 미션 위치가 swath 중심에 오려면, 위성에서 미션 위치까지의 거리가 center slant range가 되어야 함
     
-    const satelliteOffset = Cesium.Cartesian3.multiplyByScalar(
-      crossTrackUnit,
-      offset,
-      new Cesium.Cartesian3()
-    );
+    let satellitePos: Cesium.Cartesian3;
     
-    const satellitePosFromMission = Cesium.Cartesian3.add(
-      missionPos,
-      Cesium.Cartesian3.multiplyByScalar(nadirDirection, defaultAltitude, new Cesium.Cartesian3()),
-      new Cesium.Cartesian3()
-    );
-    
-    const satellitePos = Cesium.Cartesian3.subtract(
-      satellitePosFromMission,
-      satelliteOffset,
-      new Cesium.Cartesian3()
-    );
+    if (centerRange > 0) {
+      // SAR swath 중심 범위를 고려한 계산 (지구 곡률 고려)
+      // Center slant range 계산: 지구 곡률을 고려한 정확한 계산
+      const satelliteRadius = earthRadius + defaultAltitude;
+      
+      // Ground range를 각도로 변환 (지구 곡률 고려)
+      const centerRangeAngle = centerRange / earthRadius; // 라디안
+      
+      // 코사인 법칙을 사용하여 center slant range 계산
+      // R_slant² = R_earth² + R_sat² - 2 × R_earth × R_sat × cos(θ)
+      const cosAngle = Math.cos(centerRangeAngle);
+      const centerSlantRange = Math.sqrt(
+        earthRadius * earthRadius + 
+        satelliteRadius * satelliteRadius - 
+        2 * earthRadius * satelliteRadius * cosAngle
+      );
+      
+      // 미션 위치에서 위성 방향 계산
+      // 위성은 미션 위치에서 cross-track 방향으로 offset만큼 떨어져 있고,
+      // nadir 방향으로 고도만큼 떨어져 있음
+      // 지구 곡률을 고려한 offset 계산
+      // offset = R_earth × sin(center_range_angle) (대략적인 근사)
+      // 더 정확하게는 각도를 사용해서 계산
+      const offsetAngle = centerRangeAngle;
+      const offset = earthRadius * Math.sin(offsetAngle);
+      
+      const satelliteOffset = Cesium.Cartesian3.multiplyByScalar(
+        crossTrackUnit,
+        offset,
+        new Cesium.Cartesian3()
+      );
+      
+      const satellitePosFromMission = Cesium.Cartesian3.add(
+        missionPos,
+        Cesium.Cartesian3.multiplyByScalar(nadirDirection, defaultAltitude, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      
+      satellitePos = Cesium.Cartesian3.subtract(
+        satellitePosFromMission,
+        satelliteOffset,
+        new Cesium.Cartesian3()
+      );
+      
+      // 위성 위치 계산 후, 위성의 Y축이 미션 위치를 향하는지 확인
+      // 위성에서 미션 위치로의 방향 계산
+      const toMission = Cesium.Cartesian3.subtract(missionPos, satellitePos, new Cesium.Cartesian3());
+      const toMissionMag = Math.sqrt(
+        toMission.x * toMission.x +
+        toMission.y * toMission.y +
+        toMission.z * toMission.z
+      );
+      
+      if (toMissionMag > 1e-6) {
+        const toMissionNormalized = Cesium.Cartesian3.normalize(toMission, new Cesium.Cartesian3());
+        
+        // 위성의 실제 Y축 계산 (위성 위치와 속도 방향으로부터)
+        // 위성 위치에서 속도 방향 계산 (동쪽 방향 사용)
+        const satPosMag = Math.sqrt(
+          satellitePos.x * satellitePos.x +
+          satellitePos.y * satellitePos.y +
+          satellitePos.z * satellitePos.z
+        );
+        const satPosUnit = Cesium.Cartesian3.normalize(satellitePos, new Cesium.Cartesian3());
+        const satZAxis = Cesium.Cartesian3.negate(satPosUnit, new Cesium.Cartesian3()); // 지구 중심 방향
+        
+        // 위성 속도 방향 (동쪽 방향)
+        const satVelocityUnit = velocityUnit;
+        const satXAxis = satVelocityUnit;
+        
+        // 위성 Y축 = X × Z (SAR 관측 방향)
+        const satYAxis = Cesium.Cartesian3.cross(satXAxis, satZAxis, new Cesium.Cartesian3());
+        const satYAxisMag = Math.sqrt(
+          satYAxis.x * satYAxis.x +
+          satYAxis.y * satYAxis.y +
+          satYAxis.z * satYAxis.z
+        );
+        
+        if (satYAxisMag > 1e-6) {
+          const satYAxisNormalized = Cesium.Cartesian3.normalize(satYAxis, new Cesium.Cartesian3());
+          
+          // Y축과 미션 방향의 내적 계산
+          const dotProduct = toMissionNormalized.x * satYAxisNormalized.x +
+                            toMissionNormalized.y * satYAxisNormalized.y +
+                            toMissionNormalized.z * satYAxisNormalized.z;
+          
+          // 내적이 음수이면 반대 방향에 있음 -> cross-track 방향을 반대로
+          if (dotProduct < 0) {
+            console.log(`[SatelliteUIManager] 위성이 반대 방향에 배치됨 (dotProduct: ${dotProduct.toFixed(3)}). 방향 수정 중...`);
+            
+            // cross-track 방향을 반대로 하고 위성 위치 재계산
+            const reversedCrossTrackUnit = Cesium.Cartesian3.negate(crossTrackUnit, new Cesium.Cartesian3());
+            const reversedSatelliteOffset = Cesium.Cartesian3.multiplyByScalar(
+              reversedCrossTrackUnit,
+              offset,
+              new Cesium.Cartesian3()
+            );
+            
+            satellitePos = Cesium.Cartesian3.subtract(
+              satellitePosFromMission,
+              reversedSatelliteOffset,
+              new Cesium.Cartesian3()
+            );
+            
+            console.log(`[SatelliteUIManager] 위성 위치 수정 완료`);
+          } else {
+            console.log(`[SatelliteUIManager] 위성 방향 확인: 정상 (dotProduct: ${dotProduct.toFixed(3)})`);
+          }
+        }
+      }
+      
+      console.log(`[SatelliteUIManager] SAR Swath 중심 계산 (지구 곡률 고려):`);
+      console.log(`  Center Ground Range: ${centerRange.toFixed(0)}m`);
+      console.log(`  Center Range Angle: ${(centerRangeAngle * 180 / Math.PI).toFixed(4)}도`);
+      console.log(`  Center Slant Range: ${centerSlantRange.toFixed(0)}m`);
+      console.log(`  Offset: ${offset.toFixed(0)}m`);
+    } else {
+      // 기본 look angle 사용 (swath 파라미터가 없는 경우)
+      const offset = defaultAltitude * Math.tan(lookAngleRad);
+      
+      const satelliteOffset = Cesium.Cartesian3.multiplyByScalar(
+        crossTrackUnit,
+        offset,
+        new Cesium.Cartesian3()
+      );
+      
+      const satellitePosFromMission = Cesium.Cartesian3.add(
+        missionPos,
+        Cesium.Cartesian3.multiplyByScalar(nadirDirection, defaultAltitude, new Cesium.Cartesian3()),
+        new Cesium.Cartesian3()
+      );
+      
+      satellitePos = Cesium.Cartesian3.subtract(
+        satellitePosFromMission,
+        satelliteOffset,
+        new Cesium.Cartesian3()
+      );
+      
+      // 위성 위치 계산 후, 위성의 Y축이 미션 위치를 향하는지 확인
+      const toMission = Cesium.Cartesian3.subtract(missionPos, satellitePos, new Cesium.Cartesian3());
+      const toMissionMag = Math.sqrt(
+        toMission.x * toMission.x +
+        toMission.y * toMission.y +
+        toMission.z * toMission.z
+      );
+      
+      if (toMissionMag > 1e-6) {
+        const toMissionNormalized = Cesium.Cartesian3.normalize(toMission, new Cesium.Cartesian3());
+        
+        // 위성의 실제 Y축 계산
+        const satPosMag = Math.sqrt(
+          satellitePos.x * satellitePos.x +
+          satellitePos.y * satellitePos.y +
+          satellitePos.z * satellitePos.z
+        );
+        const satPosUnit = Cesium.Cartesian3.normalize(satellitePos, new Cesium.Cartesian3());
+        const satZAxis = Cesium.Cartesian3.negate(satPosUnit, new Cesium.Cartesian3());
+        const satXAxis = velocityUnit;
+        const satYAxis = Cesium.Cartesian3.cross(satXAxis, satZAxis, new Cesium.Cartesian3());
+        const satYAxisMag = Math.sqrt(
+          satYAxis.x * satYAxis.x +
+          satYAxis.y * satYAxis.y +
+          satYAxis.z * satYAxis.z
+        );
+        
+        if (satYAxisMag > 1e-6) {
+          const satYAxisNormalized = Cesium.Cartesian3.normalize(satYAxis, new Cesium.Cartesian3());
+          const dotProduct = toMissionNormalized.x * satYAxisNormalized.x +
+                            toMissionNormalized.y * satYAxisNormalized.y +
+                            toMissionNormalized.z * satYAxisNormalized.z;
+          
+          if (dotProduct < 0) {
+            console.log(`[SatelliteUIManager] 위성이 반대 방향에 배치됨 (dotProduct: ${dotProduct.toFixed(3)}). 방향 수정 중...`);
+            const reversedCrossTrackUnit = Cesium.Cartesian3.negate(crossTrackUnit, new Cesium.Cartesian3());
+            const reversedSatelliteOffset = Cesium.Cartesian3.multiplyByScalar(
+              reversedCrossTrackUnit,
+              offset,
+              new Cesium.Cartesian3()
+            );
+            
+            satellitePos = Cesium.Cartesian3.subtract(
+              satellitePosFromMission,
+              reversedSatelliteOffset,
+              new Cesium.Cartesian3()
+            );
+          }
+        }
+      }
+    }
     
     // 위성 위치를 지리 좌표로 변환
     const cartographic = Cesium.Cartographic.fromCartesian(satellitePos);
@@ -700,10 +935,16 @@ export class SatelliteUIManager {
       let bestLocalY = -Infinity; // 최고 localY 값 추적
       let bestRange = 0; // 최고 거리 추적
 
-      // 1단계: 1분 간격으로 대략적인 검색
-      const searchIntervalMinutes = 1;
+      // 1단계: 효율적인 검색을 위해 샘플링 간격 조정
+      // 16일 동안 검색하므로, 성능을 위해 간격을 조정
+      // 궤도 주기가 약 95분이므로, 5분 간격으로 샘플링해도 충분히 정확함
+      const searchIntervalMinutes = 5; // 5분 간격으로 샘플링 (성능 최적화)
       const numSamples = Math.floor(searchDurationMinutes / searchIntervalMinutes);
 
+      console.log(`[SatelliteUIManager] 미래 궤도 검색 시작: 현재 시간부터 미래 ${searchDurationMinutes}분 (${(searchDurationMinutes/60).toFixed(1)}시간, ${(searchDurationMinutes/60/24).toFixed(1)}일)`);
+      console.log(`[SatelliteUIManager] 샘플링 간격: ${searchIntervalMinutes}분, 총 ${numSamples}개 샘플 검색`);
+
+      // 미래 방향으로만 검색
       for (let i = 0; i <= numSamples; i++) {
         const sampleTime = Cesium.JulianDate.addMinutes(
           startTime,
@@ -744,6 +985,11 @@ export class SatelliteUIManager {
           new Cesium.Cartesian3()
         );
 
+        // Ascending/Descending 구분: 위도 변화 확인
+        const latitudeChange = futurePosition.latitude - position.latitude;
+        const isAscending = latitudeChange > 0; // 위도가 증가하면 ascending (북극 방향)
+        const isDescending = latitudeChange < 0; // 위도가 감소하면 descending (남극 방향)
+
         const velocityMag = Math.sqrt(
           velocityEcef.x * velocityEcef.x +
           velocityEcef.y * velocityEcef.y +
@@ -764,7 +1010,7 @@ export class SatelliteUIManager {
         const xAxis = Cesium.Cartesian3.normalize(velocityEcef, new Cesium.Cartesian3());
 
         // Y축: SAR 관측 방향 (X × Z)
-        const yAxis = Cesium.Cartesian3.cross(
+        let yAxis = Cesium.Cartesian3.cross(
           xAxis,
           zAxis,
           new Cesium.Cartesian3()
@@ -779,6 +1025,16 @@ export class SatelliteUIManager {
           continue;
         }
 
+        // Ascending/Descending에 따라 Y축 방향 확인 및 조정
+        // 위성의 우측(Y축 방향)이 항상 올바른 방향을 가리키도록 보장
+        // 극지방 근처에서는 위도 변화가 작을 수 있으므로, 경도 변화도 고려
+        const longitudeChange = futurePosition.longitude - position.longitude;
+        
+        // Y축이 위성의 우측을 가리키는지 확인
+        // Ascending pass: 위성이 북극 방향으로 이동, 우측은 동쪽 방향
+        // Descending pass: 위성이 남극 방향으로 이동, 우측은 서쪽 방향
+        // 하지만 실제로는 Y축이 위성의 우측을 가리키는지 확인해야 함
+        
         const yAxisNormalized = Cesium.Cartesian3.normalize(yAxis, new Cesium.Cartesian3());
 
         // 위성에서 미션 위치로의 벡터
@@ -800,9 +1056,30 @@ export class SatelliteUIManager {
         const toMissionNormalized = Cesium.Cartesian3.normalize(toMission, new Cesium.Cartesian3());
 
         // 미션 방향을 로컬 좌표계로 변환 (Y축과의 내적)
-        const localY = toMissionNormalized.x * yAxisNormalized.x +
-                      toMissionNormalized.y * yAxisNormalized.y +
-                      toMissionNormalized.z * yAxisNormalized.z;
+        let localY = toMissionNormalized.x * yAxisNormalized.x +
+                     toMissionNormalized.y * yAxisNormalized.y +
+                     toMissionNormalized.z * yAxisNormalized.z;
+
+        // Ascending/Descending에 따라 Y축 방향 확인
+        // 위성의 우측(Y축 방향)에 미션 위치가 있어야 함
+        // localY가 양수면 Y축 방향, 음수면 반대 방향
+        
+        // 극지방 근처에서는 위도 변화가 작을 수 있으므로,
+        // 미션 위치가 위성의 우측에 있는지 확인
+        // 위성의 속도 벡터(X축)와 미션 방향의 외적을 사용하여 우측/좌측 판단
+        const xAxisNormalized = Cesium.Cartesian3.normalize(velocityEcef, new Cesium.Cartesian3());
+        const crossProduct = Cesium.Cartesian3.cross(
+          xAxisNormalized,
+          toMissionNormalized,
+          new Cesium.Cartesian3()
+        );
+        const dotWithZ = crossProduct.x * zAxis.x + crossProduct.y * zAxis.y + crossProduct.z * zAxis.z;
+        
+        // dotWithZ가 양수면 미션 위치가 위성의 우측에 있음
+        // localY도 양수여야 Y축 방향에 있음
+        if (localY <= 0 || dotWithZ <= 0) {
+          continue;
+        }
 
         // 위성에서 미션 위치까지의 거리 (ground range, 대략적인 근사)
         // 실제로는 지구 곡률을 고려해야 하지만, 여기서는 간단히 ECEF 거리를 사용
@@ -839,8 +1116,8 @@ export class SatelliteUIManager {
           }
         }
         
-        // Y축 방향 일치도 점수 (양수일 때만 점수 부여)
-        const directionScore = localY > 0 ? localY * 500 : localY * 100; // 양수일 때 더 높은 점수
+        // Y축 방향 일치도 점수 (localY는 이미 양수로 필터링됨)
+        const directionScore = localY * 500; // Y축 방향 일치도 (클수록 좋음)
         
         // 최종 점수: 방향 일치도 + 거리 적합도
         const score = directionScore + rangeScore;
@@ -910,6 +1187,9 @@ export class SatelliteUIManager {
           new Cesium.Cartesian3()
         );
 
+        // Ascending/Descending 구분: 위도 변화 확인
+        const latitudeChange = futurePosition.latitude - position.latitude;
+
         const velocityMag = Math.sqrt(
           velocityEcef.x * velocityEcef.x +
           velocityEcef.y * velocityEcef.y +
@@ -949,9 +1229,25 @@ export class SatelliteUIManager {
         }
 
         const toMissionNormalized = Cesium.Cartesian3.normalize(toMission, new Cesium.Cartesian3());
-        const localY = toMissionNormalized.x * yAxisNormalized.x +
-                      toMissionNormalized.y * yAxisNormalized.y +
-                      toMissionNormalized.z * yAxisNormalized.z;
+        let localY = toMissionNormalized.x * yAxisNormalized.x +
+                     toMissionNormalized.y * yAxisNormalized.y +
+                     toMissionNormalized.z * yAxisNormalized.z;
+
+        // Ascending/Descending에 따라 Y축 방향 확인
+        // 위성의 우측(Y축 방향)에 미션 위치가 있어야 함
+        const xAxisNormalized = Cesium.Cartesian3.normalize(velocityEcef, new Cesium.Cartesian3());
+        const crossProduct = Cesium.Cartesian3.cross(
+          xAxisNormalized,
+          toMissionNormalized,
+          new Cesium.Cartesian3()
+        );
+        const dotWithZ = crossProduct.x * zAxis.x + crossProduct.y * zAxis.y + crossProduct.z * zAxis.z;
+        
+        // dotWithZ가 양수면 미션 위치가 위성의 우측에 있음
+        // localY도 양수여야 Y축 방향에 있음
+        if (localY <= 0 || dotWithZ <= 0) {
+          continue;
+        }
 
         // 거리 계산 (ground range)
         const satAltitude = position.altitude;
@@ -978,7 +1274,8 @@ export class SatelliteUIManager {
           }
         }
         
-        const directionScore = localY > 0 ? localY * 500 : localY * 100;
+        // Y축 방향 일치도 점수 (localY는 이미 양수로 필터링됨)
+        const directionScore = localY * 500; // Y축 방향 일치도 (클수록 좋음)
         const score = directionScore + rangeScore;
 
         if (score > refinedBestScore) {
@@ -1029,6 +1326,86 @@ export class SatelliteUIManager {
       console.error('[SatelliteUIManager] TLE 궤도 검색 실패:', error);
       return null;
     }
+  }
+
+  /**
+   * TLE 모드에서 위성 위치를 조정하여 미션 위치가 swath 중심에 오도록 함
+   * 위성의 궤도는 고정되어 있으므로, 시간을 미세 조정하여 거리를 맞춤
+   */
+  private adjustSatellitePositionForSwathCenter(
+    currentPosition: { longitude: number; latitude: number; altitude: number },
+    missionLon: number,
+    missionLat: number,
+    centerRange: number,
+    satelliteManager: SatelliteManager,
+    baseTime: any
+  ): { longitude: number; latitude: number; altitude: number } {
+    // 현재 거리 계산
+    const currentDistance = this.calculateGreatCircleDistance(
+      missionLat,
+      missionLon,
+      currentPosition.latitude,
+      currentPosition.longitude
+    );
+    
+    // 거리가 이미 center range에 가까우면 조정 불필요
+    const distanceDiff = Math.abs(currentDistance - centerRange);
+    if (distanceDiff < 1000) { // 1km 이내면 조정 불필요
+      console.log(`[SatelliteUIManager] 거리가 이미 적절함: ${(currentDistance/1000).toFixed(2)}km (목표: ${(centerRange/1000).toFixed(2)}km)`);
+      return currentPosition;
+    }
+    
+    // 위성 속도 계산 (초당 이동 거리)
+    const futureTime = Cesium.JulianDate.addSeconds(baseTime, 1.0, new Cesium.JulianDate());
+    const futurePosition = satelliteManager.calculatePosition(futureTime);
+    
+    if (!futurePosition) {
+      return currentPosition;
+    }
+    
+    const velocity = this.calculateGreatCircleDistance(
+      currentPosition.latitude,
+      currentPosition.longitude,
+      futurePosition.latitude,
+      futurePosition.longitude
+    ); // m/s
+    
+    // 목표 거리까지 가기 위해 필요한 시간 조정
+    // 거리가 너무 멀면 과거로, 너무 가까우면 미래로 이동
+    const timeAdjustment = (currentDistance - centerRange) / velocity; // 초
+    
+    // 시간 조정 범위 제한 (±5분)
+    const maxAdjustment = 300; // 5분
+    const clampedAdjustment = Math.max(-maxAdjustment, Math.min(maxAdjustment, timeAdjustment));
+    
+    // 조정된 시간의 위성 위치 계산
+    const adjustedTime = Cesium.JulianDate.addSeconds(
+      baseTime,
+      clampedAdjustment,
+      new Cesium.JulianDate()
+    );
+    
+    const adjustedPosition = satelliteManager.calculatePosition(adjustedTime);
+    
+    if (!adjustedPosition) {
+      return currentPosition;
+    }
+    
+    // 조정 후 거리 확인
+    const adjustedDistance = this.calculateGreatCircleDistance(
+      missionLat,
+      missionLon,
+      adjustedPosition.latitude,
+      adjustedPosition.longitude
+    );
+    
+    console.log(`[SatelliteUIManager] 위성 위치 조정:`);
+    console.log(`  원래 거리: ${(currentDistance/1000).toFixed(2)}km`);
+    console.log(`  목표 거리: ${(centerRange/1000).toFixed(2)}km`);
+    console.log(`  조정 후 거리: ${(adjustedDistance/1000).toFixed(2)}km`);
+    console.log(`  시간 조정: ${clampedAdjustment.toFixed(1)}초`);
+    
+    return adjustedPosition;
   }
 
   /**
@@ -1096,13 +1473,39 @@ export class SatelliteUIManager {
       const startTime = Cesium.JulianDate.now();
 
       // TLE 궤도에서 미션 위치에 가장 가까운 시점 찾기
-      // 위성 궤도 주기는 약 90-100분이므로, 여러 궤도를 검색하기 위해 24시간(1440분) 검색
+      // 같은 지표면 위치로 돌아오는 주기(약 16일) 동안의 모든 궤도를 분석하여 최적 위치 찾기
+      
+      // TLE에서 궤도 주기 계산
+      const orbitalPeriodMinutes = this.tleParser.calculateOrbitalPeriod(tleText);
+      const meanMotion = this.tleParser.extractMeanMotion(tleText);
+      
+      // Ground Track Repeat Cycle 추정
+      // 일반적으로 같은 지표면 위치로 돌아오는 주기는 16일 정도이지만,
+      // 정확한 계산을 위해서는 궤도 경사각과 RAAN을 고려해야 함
+      // 여기서는 안전하게 16일로 설정 (약 230개의 궤도 주기)
+      const searchDurationDays = 16;
+      const searchDurationHours = searchDurationDays * 24; // 384시간
+      const searchDurationMinutes = searchDurationHours * 60; // 23040분
+      
+      // 궤도 주기 기반 추정
+      let estimatedOrbits = 0;
+      if (orbitalPeriodMinutes) {
+        estimatedOrbits = Math.floor(searchDurationMinutes / orbitalPeriodMinutes);
+        console.log(`[SatelliteUIManager] TLE 궤도 주기: ${orbitalPeriodMinutes.toFixed(2)}분 (${(orbitalPeriodMinutes/60).toFixed(2)}시간)`);
+      }
+      if (meanMotion) {
+        console.log(`[SatelliteUIManager] 평균 운동: ${meanMotion.toFixed(8)} revolutions/day`);
+      }
+      
+      console.log(`[SatelliteUIManager] 미래 궤도 검색: ${searchDurationHours}시간 (${searchDurationDays}일, 약 ${estimatedOrbits}개 궤도 주기)`);
+      console.log(`[SatelliteUIManager] 같은 지표면 위치로 돌아오는 주기 동안 모든 궤도 분석`);
+      
       const result = this.findClosestTimeToMissionInTLE(
         tleText,
         missionLon,
         missionLat,
         startTime,
-        1440 // 24시간 동안 검색 (약 14-16개 궤도 주기)
+        searchDurationMinutes
       );
 
       if (!result) {
@@ -1118,10 +1521,40 @@ export class SatelliteUIManager {
 
       // 해당 시점의 위성 위치 계산
       const tempManager = new SatelliteManager(tleText);
-      const position = tempManager.calculatePosition(targetTime);
+      let position = tempManager.calculatePosition(targetTime);
 
       if (!position) {
         throw new Error('위성 위치 계산 실패');
+      }
+
+      // SAR swath 중심 범위를 고려하여 위성 위치 조정
+      // 미션 위치가 swath 중심에 오도록 위성 위치를 조정
+      const swathNearRangeInput = document.getElementById('swathNearRange') as HTMLInputElement;
+      const swathWidthInput = document.getElementById('swathWidth') as HTMLInputElement;
+      
+      let adjustedPosition = position;
+      if (swathNearRangeInput && swathWidthInput) {
+        const nearRange = parseFloat(swathNearRangeInput.value || '200000');
+        const swathWidth = parseFloat(swathWidthInput.value || '400000');
+        
+        if (!isNaN(nearRange) && !isNaN(swathWidth) && swathWidth > 0) {
+          const centerRange = nearRange + swathWidth / 2;
+          
+          // 위성 위치를 조정해서 미션 위치가 swath 중심에 오도록 함
+          adjustedPosition = this.adjustSatellitePositionForSwathCenter(
+            position,
+            missionLon,
+            missionLat,
+            centerRange,
+            tempManager,
+            targetTime
+          );
+          
+          console.log(`[SatelliteUIManager] SAR Swath 중심 범위 고려하여 위성 위치 조정`);
+          console.log(`  원래 위치: 경도 ${position.longitude.toFixed(4)}°, 위도 ${position.latitude.toFixed(4)}°`);
+          console.log(`  조정 위치: 경도 ${adjustedPosition.longitude.toFixed(4)}°, 위도 ${adjustedPosition.latitude.toFixed(4)}°`);
+          console.log(`  Center Range: ${centerRange.toFixed(0)}m`);
+        }
       }
 
       // TLE 데이터 저장 및 모드 설정 (위치 업데이트 전에 설정)
@@ -1131,14 +1564,15 @@ export class SatelliteUIManager {
       // Cesium 시계를 해당 시점으로 설정 (위치 업데이트 전에 설정)
       this.entityManager.setClockTime(targetTime);
 
-      // 위성 위치 업데이트
-      this.entityManager.updatePosition(position);
+      // 위성 위치 업데이트 (조정된 위치 사용)
+      this.entityManager.updatePosition(adjustedPosition);
 
-      // 미션 위치 마커 표시
+      // 미션 위치 마커 표시 (날짜/시간 포함)
+      // result.time은 위성이 미션 위치에 가장 가까운 시점
       this.entityManager.setMissionLocation({
         longitude: missionLon,
         latitude: missionLat
-      });
+      }, result.time);
 
       // 계산된 고도를 UI에 표시
       if (this.satelliteAltitudeTLE && position.altitude) {
@@ -1162,7 +1596,36 @@ export class SatelliteUIManager {
       console.log(`  미션 위치: 경도 ${missionLon.toFixed(4)}°, 위도 ${missionLat.toFixed(4)}°`);
       console.log(`  가장 가까운 시점: ${missionDate.toISOString()}, 거리: ${distanceKm.toFixed(2)}km`);
       console.log(`  위성 이동 시점: ${targetDate.toISOString()} (${timeOffsetMinutes}분 전)`);
-      console.log(`  위성 위치: 경도 ${position.longitude.toFixed(4)}°, 위도 ${position.latitude.toFixed(4)}°, 고도 ${position.altitude.toFixed(0)}m`);
+      console.log(`  위성 위치: 경도 ${adjustedPosition.longitude.toFixed(4)}°, 위도 ${adjustedPosition.latitude.toFixed(4)}°, 고도 ${adjustedPosition.altitude.toFixed(0)}m`);
+      
+      // 조정 후 실제 거리 계산
+      let centerRange = 0;
+      if (swathNearRangeInput && swathWidthInput) {
+        const nearRange = parseFloat(swathNearRangeInput.value || '200000');
+        const swathWidth = parseFloat(swathWidthInput.value || '400000');
+        if (!isNaN(nearRange) && !isNaN(swathWidth) && swathWidth > 0) {
+          centerRange = nearRange + swathWidth / 2;
+        }
+      }
+      
+      const adjustedDistance = this.calculateGreatCircleDistance(
+        missionLat,
+        missionLon,
+        adjustedPosition.latitude,
+        adjustedPosition.longitude
+      );
+      const targetCenterRange = centerRange > 0 ? (centerRange / 1000).toFixed(2) : 'N/A';
+      console.log(`  조정 후 거리: ${(adjustedDistance / 1000).toFixed(2)}km (목표: ${targetCenterRange}km)`);
+      
+      // 상태 메시지에 조정 후 거리 표시
+      const adjustedDistanceKm = adjustedDistance / 1000;
+      if (Math.abs(adjustedDistanceKm - distanceKm) > 0.1) {
+        this.tleMissionStatus.textContent = 
+          `미션 위치로 이동 완료!\n` +
+          `가장 가까운 시점: ${missionDate.toLocaleString()}\n` +
+          `거리: ${distanceKm.toFixed(2)}km → ${adjustedDistanceKm.toFixed(2)}km (조정됨)\n` +
+          `위성 위치: ${targetDate.toLocaleString()}`;
+      }
 
       // 예상 경로 다시 그리기
       this.entityManager.updatePredictedPath(4);
@@ -1348,6 +1811,180 @@ export class SatelliteUIManager {
     } catch (error: any) {
       alert('TLE 삭제 실패: ' + (error.message || '알 수 없는 오류'));
       console.error('[SatelliteUIManager] TLE 삭제 실패:', error);
+    }
+  }
+
+  /**
+   * 미션 위치 선택 모드 토글
+   */
+  toggleMissionLocationSelection(active: boolean): void {
+    this.isMissionLocationSelectionActive = active;
+    
+    // 커서 스타일 변경
+    if (this.viewerManager) {
+      if (active) {
+        this.viewerManager.setCursorStyle('crosshair');
+      } else {
+        this.viewerManager.setCursorStyle('default');
+      }
+    }
+    
+    // 버튼 상태 업데이트
+    if (this.selectMissionLocationButton) {
+      if (active) {
+        this.selectMissionLocationButton.textContent = '미션 위치 선택 중... (지도 클릭)';
+        this.selectMissionLocationButton.classList.add('active');
+      } else {
+        this.selectMissionLocationButton.textContent = '지도에서 미션 위치 선택';
+        this.selectMissionLocationButton.classList.remove('active');
+      }
+    }
+    
+    if (this.selectMissionLocationTLEButton) {
+      if (active) {
+        this.selectMissionLocationTLEButton.textContent = '미션 위치 선택 중... (지도 클릭)';
+        this.selectMissionLocationTLEButton.classList.add('active');
+      } else {
+        this.selectMissionLocationTLEButton.textContent = '지도에서 미션 위치 선택';
+        this.selectMissionLocationTLEButton.classList.remove('active');
+      }
+    }
+    
+    console.log('[SatelliteUIManager] 미션 위치 선택 모드:', active ? '활성화' : '비활성화');
+  }
+
+  /**
+   * 미션 위치 선택 모드 활성화 상태 확인
+   */
+  isMissionLocationSelectionModeActive(): boolean {
+    return this.isMissionLocationSelectionActive;
+  }
+
+  /**
+   * 지도 클릭 좌표를 미션 위치로 설정
+   */
+  setMissionLocationFromClick(longitude: number, latitude: number): void {
+    // 미션 위치 선택 모드가 활성화되지 않았으면 무시
+    if (!this.isMissionLocationSelectionActive) {
+      return;
+    }
+    
+    console.log('[SatelliteUIManager] 지도 클릭 좌표:', longitude, latitude);
+    
+    // 현재 모드 확인
+    const currentMode = this.satelliteModeSelect?.value as SatelliteMode;
+    console.log('[SatelliteUIManager] 현재 모드:', currentMode);
+    
+    if (currentMode === SatelliteMode.POSITION_VELOCITY) {
+      // 위치/속도 모드: missionLongitude, missionLatitude 사용
+      const missionLonInput = document.getElementById('missionLongitude') as HTMLInputElement;
+      const missionLatInput = document.getElementById('missionLatitude') as HTMLInputElement;
+      
+      console.log('[SatelliteUIManager] 위치/속도 모드 입력 필드:', missionLonInput, missionLatInput);
+      
+      // positionVelocityInput div가 숨겨져 있으면 표시
+      if (this.positionVelocityInput && this.positionVelocityInput.style.display === 'none') {
+        this.positionVelocityInput.style.display = 'block';
+        console.log('[SatelliteUIManager] positionVelocityInput div 표시');
+      }
+      
+      if (missionLonInput && missionLatInput) {
+        missionLonInput.value = longitude.toFixed(6);
+        missionLatInput.value = latitude.toFixed(6);
+        
+        console.log('[SatelliteUIManager] 입력 필드 값 설정:', missionLonInput.value, missionLatInput.value);
+        
+        // change 이벤트를 트리거하여 위성 위치 자동 계산
+        missionLonInput.dispatchEvent(new Event('change', { bubbles: true }));
+        missionLatInput.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // 미션 위치 선택 모드 비활성화
+        this.toggleMissionLocationSelection(false);
+      } else {
+        console.warn('[SatelliteUIManager] 위치/속도 모드 입력 필드를 찾을 수 없습니다.');
+      }
+    } else {
+      // TLE 모드: missionLongitudeTLE, missionLatitudeTLE 사용
+      // tleInput div가 숨겨져 있으면 표시
+      if (this.tleInput && this.tleInput.style.display === 'none') {
+        this.tleInput.style.display = 'block';
+        console.log('[SatelliteUIManager] tleInput div 표시');
+      }
+      
+      if (this.missionLongitudeTLE && this.missionLatitudeTLE) {
+        this.missionLongitudeTLE.value = longitude.toFixed(6);
+        this.missionLatitudeTLE.value = latitude.toFixed(6);
+        
+        console.log('[SatelliteUIManager] TLE 모드 입력 필드 값 설정:', this.missionLongitudeTLE.value, this.missionLatitudeTLE.value);
+        
+        // change 이벤트를 트리거
+        this.missionLongitudeTLE.dispatchEvent(new Event('change', { bubbles: true }));
+        this.missionLatitudeTLE.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // 미션 위치 선택 모드 비활성화
+        this.toggleMissionLocationSelection(false);
+      } else {
+        console.warn('[SatelliteUIManager] TLE 모드 입력 필드를 찾을 수 없습니다.');
+      }
+    }
+  }
+
+  /**
+   * 전체 궤도 보기
+   * TLE 데이터를 기반으로 전체 궤도를 그립니다 (24시간, 약 14-16개 궤도 주기)
+   */
+  private showFullOrbit(): void {
+    if (!this.tleInputText || !this.tleInputText.value.trim()) {
+      alert('TLE 데이터를 먼저 입력하고 적용하세요.');
+      return;
+    }
+
+    const tleText = this.tleInputText.value.trim();
+    
+    // TLE가 적용되어 있는지 확인
+    if (!this.satelliteManager.useTLE) {
+      alert('TLE를 먼저 적용하세요.');
+      return;
+    }
+
+    try {
+      // 전체 궤도 그리기 (24시간 = 약 14-16개 궤도 주기)
+      // 위성 궤도 주기는 보통 90-100분이므로, 24시간이면 약 14-16개 주기를 볼 수 있음
+      const orbitHours = 24;
+      
+      console.log(`[SatelliteUIManager] 전체 궤도 그리기 시작 (${orbitHours}시간)`);
+      
+      // 예상 경로 그리기
+      this.entityManager.drawPredictedPath(orbitHours);
+      
+      // 카메라를 전체 궤도를 볼 수 있도록 조정
+      const currentPosition = this.satelliteManager.calculatePosition(Cesium.JulianDate.now());
+      if (currentPosition) {
+        // 위성 위치에서 충분히 멀리 떨어진 위치로 카메라 이동
+        const cameraHeight = 50000000; // 50,000km
+        const cameraPosition = Cesium.Cartesian3.fromDegrees(
+          currentPosition.longitude,
+          currentPosition.latitude,
+          cameraHeight
+        );
+        
+        // 카메라 설정 (전체 궤도를 볼 수 있도록)
+        if (this.viewerManager) {
+          this.viewerManager.setupCamera(
+            cameraPosition,
+            {
+              heading: Cesium.Math.toRadians(0.0),
+              pitch: Cesium.Math.toRadians(-90.0),
+            },
+            2.0
+          );
+        }
+      }
+      
+      console.log(`[SatelliteUIManager] 전체 궤도 그리기 완료`);
+    } catch (error: any) {
+      console.error('[SatelliteUIManager] 전체 궤도 그리기 실패:', error);
+      alert('전체 궤도 그리기 실패: ' + error.message);
     }
   }
 }

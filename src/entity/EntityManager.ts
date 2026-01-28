@@ -538,12 +538,31 @@ export class EntityManager {
   /**
    * 미션 위치 마커 설정
    * @param missionLocation 미션 위치 (longitude, latitude)
+   * @param missionTime 미션 시간 (JulianDate, 선택적)
    */
-  setMissionLocation(missionLocation: { longitude: number; latitude: number }): void {
+  setMissionLocation(missionLocation: { longitude: number; latitude: number }, missionTime?: any): void {
     // 기존 미션 위치 마커 제거
     if (this.missionLocationEntity) {
       this.viewer.entities.remove(this.missionLocationEntity);
       this.missionLocationEntity = null;
+    }
+
+    // 레이블 텍스트 생성
+    let labelText = '미션 위치';
+    if (missionTime) {
+      const missionDate = Cesium.JulianDate.toDate(missionTime);
+      const dateStr = missionDate.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const timeStr = missionDate.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      labelText = `미션 위치\n${dateStr} ${timeStr}`;
     }
 
     // 새로운 미션 위치 마커 추가
@@ -565,8 +584,8 @@ export class EntityManager {
         translucencyByDistance: new Cesium.NearFarScalar(1.5e7, 1.0, 2.0e7, 1.0),
       },
       label: {
-        text: '미션 위치',
-        font: '16px sans-serif',
+        text: labelText,
+        font: '14px sans-serif',
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 2,

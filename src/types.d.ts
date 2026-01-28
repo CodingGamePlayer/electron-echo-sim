@@ -224,6 +224,37 @@ declare namespace Cesium {
   class NearFarScalar {
     constructor(near?: number, nearValue?: number, far?: number, farValue?: number);
   }
+  
+  // ScreenSpaceEventHandler 관련
+  class ScreenSpaceEventHandler {
+    constructor(element: HTMLElement | HTMLCanvasElement);
+    setInputAction(action: (event: any) => void, type: ScreenSpaceEventType, modifier?: KeyboardEventModifier): void;
+    destroy(): void;
+  }
+  
+  enum ScreenSpaceEventType {
+    LEFT_DOWN = 0,
+    LEFT_UP = 1,
+    LEFT_CLICK = 2,
+    LEFT_DOUBLE_CLICK = 3,
+    RIGHT_DOWN = 4,
+    RIGHT_UP = 5,
+    RIGHT_CLICK = 6,
+    MIDDLE_DOWN = 7,
+    MIDDLE_UP = 8,
+    MIDDLE_CLICK = 9,
+    MOUSE_MOVE = 10,
+    WHEEL = 11,
+    PINCH_START = 12,
+    PINCH_END = 13,
+    PINCH_MOVE = 14
+  }
+  
+  enum KeyboardEventModifier {
+    SHIFT = 1,
+    CTRL = 2,
+    ALT = 4
+  }
 }
 declare var Cesium: typeof Cesium;
 declare var satellite: any;

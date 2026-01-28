@@ -31,11 +31,13 @@ export class PredictedPathManager {
     }
 
     const currentTime = this.viewer.clock.currentTime;
-    const sampleInterval = 5;
+    const sampleInterval = 5; // 5분 간격
     
-    // 과거 1시간과 미래 1시간 (총 2시간)
-    const pastMinutes = 60;
-    const futureMinutes = 60;
+    // hours 파라미터를 사용하여 과거와 미래 시간 계산
+    // 전체 시간을 과거와 미래로 나눔
+    const totalMinutes = hours * 60;
+    const pastMinutes = Math.floor(totalMinutes / 2);
+    const futureMinutes = Math.floor(totalMinutes / 2);
     const pastSamples = Math.floor(pastMinutes / sampleInterval);
     const futureSamples = Math.floor(futureMinutes / sampleInterval);
 
