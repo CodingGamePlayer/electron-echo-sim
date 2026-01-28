@@ -152,13 +152,13 @@ export class Layout {
       }
 
       .menu-icon {
-        font-size: 18px;
-        margin-bottom: 2px;
+        font-size: 24px;
+        margin-bottom: 4px;
         line-height: 1;
       }
 
       .menu-label {
-        font-size: 9px;
+        font-size: 11px;
         text-align: center;
         color: #ccc;
         font-weight: 500;
