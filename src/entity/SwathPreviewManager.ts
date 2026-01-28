@@ -266,7 +266,7 @@ export class SwathPreviewManager {
             width: 0.5,
             material: Cesium.Color.YELLOW.withAlpha(0.8),
             clampToGround: false,
-            arcType: Cesium.ArcType.GEODESIC,
+            arcType: Cesium.ArcType.NONE,
           },
         });
 
