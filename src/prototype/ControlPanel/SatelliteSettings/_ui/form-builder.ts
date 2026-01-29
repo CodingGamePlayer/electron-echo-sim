@@ -102,12 +102,7 @@ export function createInputField(
   
   input.style.width = '100%';
   input.style.marginTop = '4px';
-  input.style.padding = '6px';
-  input.style.backgroundColor = '#2a2a2a';
-  input.style.color = '#fff';
-  input.style.border = '1px solid #444';
-  input.style.borderRadius = '4px';
-  input.style.boxSizing = 'border-box';
+  input.style.padding = '4px';
 
   label.appendChild(input);
   return label;

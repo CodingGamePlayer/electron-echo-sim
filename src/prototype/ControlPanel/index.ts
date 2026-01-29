@@ -95,6 +95,7 @@ export class ControlPanelManager {
     const orbitTabContent = document.createElement('div');
     orbitTabContent.id = 'orbitTab';
     orbitTabContent.className = 'tab-content';
+    orbitTabContent.style.paddingTop = '0';
     tabContainer.appendChild(orbitTabContent);
 
     // 타겟 설정 탭 콘텐츠
