@@ -341,11 +341,13 @@ export class SatelliteSettings {
         const altitude = parseFloat(altInput);
 
         // 입력값 검증 (NaN 체크 포함)
+        // 위치 수정 시에도 우주 공간(50,000km)에 생성되도록 고도 고정
         if (!isNaN(longitude) && !isNaN(latitude) && !isNaN(altitude) &&
             longitude >= -180 && longitude <= 180 && 
             latitude >= -90 && latitude <= 90 && 
             altitude >= 0) {
-          this.busPayloadManager.updatePosition({ longitude, latitude, altitude });
+          const spaceAltitude = 50000000; // 50,000km (지구 반지름의 약 8배)
+          this.busPayloadManager.updatePosition({ longitude, latitude, altitude: spaceAltitude });
         }
       }
 
@@ -528,9 +530,33 @@ export class SatelliteSettings {
           return;
         }
 
-      // BUS 엔티티에 카메라 고정 및 대각선 뷰 설정 (자동으로 시작하지 않음)
-      // 사용자가 카메라 추적 버튼을 눌러야 추적 시작
-      console.log('[SatelliteSettings] 위성 엔티티 생성 완료. 카메라 추적 버튼을 눌러 추적을 시작할 수 있습니다.');
+        // 엔티티 생성 시 한 번만 카메라가 엔티티를 바라보도록 설정
+        if (busEntity) {
+          const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
+          if (busPosition) {
+            // BUS 크기 정보로 적절한 거리 계산
+            const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
+            const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
+            const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
+            const maxBusSize = Math.max(busLength, busWidth, busHeight);
+            
+            // 대각선에서 바라보는 각도 설정
+            const cameraRange = Math.max(maxBusSize * 3, 20);
+            
+            // 한 번만 카메라를 엔티티로 이동
+            this.viewer.camera.lookAt(
+              busPosition,
+              new Cesium.HeadingPitchRange(
+                Cesium.Math.toRadians(45), // heading: 대각선 방향
+                Cesium.Math.toRadians(0), // pitch: 수평선에 가까운 대각선 뷰
+                cameraRange // range: 거리
+              )
+            );
+          }
+        }
+        
+        // 추적 모드는 OFF 상태로 유지
+        console.log('[SatelliteSettings] 위성 엔티티 생성 완료. 카메라가 한 번 엔티티를 바라본 후 추적 모드는 OFF 상태입니다.');
       }, 300); // 엔티티 생성 완료 대기 시간
 
       console.log('[SatelliteSettings] 위성 엔티티 생성 완료 (우주 공간)');

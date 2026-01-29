@@ -40,7 +40,7 @@ export class SatelliteBusPayloadManager {
     this.position = null;
     this.currentCartesian = null;
     this.axisEntities = null;
-    this.axisLength = 50000; // 기본값: 50km
+    this.axisLength = 5; // 기본값: 1km
     this.axisVisible = true;
     this.busDimensions = null;
     this.antennaParams = null;
