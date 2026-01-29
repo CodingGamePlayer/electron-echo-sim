@@ -1,5 +1,7 @@
 import { SatelliteBusPayloadManager } from '../SatelliteBusPayloadManager/index.js';
 import { parseSatelliteBasicInfo, parsePositionInputs, parseBusDimensionsInputs, parseAntennaDimensionsInputs, parseAntennaGapInput, parseAntennaOrientationInputs } from './input-parser.js';
+import { CAMERA, DEFAULT_BUS_DIMENSIONS_MM } from '../constants.js';
+import { setupCameraAngle as setupCamera } from './camera-manager.js';
 
 /**
  * 엔티티 생성 유틸리티
@@ -67,8 +69,13 @@ export function createSatelliteEntity(
     return false;
   }
 
-  const antennaGapMm = parseFloat((document.getElementById('prototypeAntennaGap') as HTMLInputElement)?.value || '100');
-  const antennaGap = antennaGapMm / 1000;
+  const antennaGap = parseAntennaGapInput();
+  if (antennaGap === null) {
+    if (showAlert) {
+      alert('안테나 간격을 올바르게 입력해주세요.');
+    }
+    return false;
+  }
 
   const antennaOrientation = parseAntennaOrientationInputs();
   if (!antennaOrientation) {
@@ -118,90 +125,24 @@ export function createSatelliteEntity(
  */
 export function calculateCameraRange(): number {
   // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
-  const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
-  const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
-  const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
+  const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.LENGTH));
+  const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.WIDTH));
+  const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.HEIGHT));
   const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
   
-  // BUS 크기의 10배 정도 거리에서 보면 적절함 (엔티티가 잘 보이도록)
-  return Math.max(maxBusSize * 10, 3); // 최소 3m, BUS 크기의 10배
+  // BUS 크기의 배수 거리에서 보면 적절함 (엔티티가 잘 보이도록)
+  return Math.max(maxBusSize * CAMERA.RANGE_MULTIPLIER, CAMERA.MIN_RANGE);
 }
 
 /**
  * 카메라 각도 설정
+ * @deprecated 이 함수는 camera-manager.ts의 setupCameraAngle로 이동되었습니다.
+ * 호환성을 위해 유지되지만, 새로운 코드에서는 camera-manager를 사용하세요.
  */
 export function setupCameraAngle(
   viewer: any,
   busEntity: any
 ): void {
-  if (!viewer || !busEntity) {
-    console.error('[setupCameraAngle] viewer 또는 busEntity가 없습니다.');
-    return;
-  }
-
-  // trackedEntity 해제 (카메라 이동 방해 방지)
-  viewer.trackedEntity = undefined;
-
-  const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
-  if (!busPosition) {
-    console.error('[setupCameraAngle] BUS 위치를 가져올 수 없습니다.');
-    return;
-  }
-
-  console.log('[setupCameraAngle] BUS 위치:', busPosition);
-
-  // 공통 함수로 카메라 거리 계산
-  const cameraRange = calculateCameraRange();
-  
-  console.log('[setupCameraAngle] 카메라 범위:', cameraRange, 'm');
-  console.log('[setupCameraAngle] Heading: 45도, Pitch: -45도, Range:', cameraRange, 'm');
-
-  try {
-    // 기존 카메라 애니메이션 취소
-    if (viewer.camera._flight && viewer.camera._flight.isActive()) {
-      console.log('[setupCameraAngle] 기존 카메라 애니메이션 취소');
-      viewer.camera.cancelFlight();
-    }
-
-    // 약간의 지연 후 카메라 이동 (기존 애니메이션 완전 종료 대기)
-    setTimeout(() => {
-      // flyTo를 사용하여 부드럽게 이동
-      viewer.camera.flyTo({
-        destination: busPosition,
-        orientation: {
-          heading: Cesium.Math.toRadians(45), // 대각선 방향
-          pitch: Cesium.Math.toRadians(-45), // 위에서 45도 각도로 내려다보기
-          roll: 0.0
-        },
-        duration: 1.5, // 1.5초 동안 이동
-        complete: () => {
-          console.log('[setupCameraAngle] 카메라 이동 완료');
-          // 이동 후 정확한 거리로 조정
-          viewer.camera.lookAt(
-            busPosition,
-            new Cesium.HeadingPitchRange(
-              Cesium.Math.toRadians(45), // heading: 대각선 방향
-              Cesium.Math.toRadians(-45), // pitch: 위에서 45도 각도로 내려다보기
-              cameraRange
-            )
-          );
-        }
-      });
-    }, 100); // 기존 애니메이션 취소 후 100ms 대기
-  } catch (error) {
-    console.error('[setupCameraAngle] 카메라 이동 오류:', error);
-    // flyTo 실패 시 lookAt으로 폴백
-    try {
-      viewer.camera.lookAt(
-        busPosition,
-        new Cesium.HeadingPitchRange(
-          Cesium.Math.toRadians(45), // heading: 대각선 방향
-          Cesium.Math.toRadians(-45), // pitch: 위에서 45도 각도로 내려다보기
-          cameraRange
-        )
-      );
-    } catch (fallbackError) {
-      console.error('[setupCameraAngle] lookAt 폴백도 실패:', fallbackError);
-    }
-  }
+  // camera-manager로 위임
+  setupCamera(viewer, busEntity);
 }

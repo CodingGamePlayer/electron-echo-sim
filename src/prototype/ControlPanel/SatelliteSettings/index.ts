@@ -1,8 +1,21 @@
 import { SatelliteBusPayloadManager } from './SatelliteBusPayloadManager/index.js';
 import { renderSatelliteSettingsForm, FormRendererCallbacks } from './_ui/form-renderer.js';
 import { updateEntity } from './_util/entity-updater.js';
-import { createSatelliteEntity, setupCameraAngle } from './_util/entity-creator.js';
+import { createSatelliteEntity } from './_util/entity-creator.js';
 import { getDirectionForInputId } from './_util/direction-mapper.js';
+import { waitForCameraReady, setupCameraAngle, setupCanvasFocus } from './_util/camera-manager.js';
+import { 
+  TIMER, 
+  DEFAULT_POSITION, 
+  DEFAULT_BUS_DIMENSIONS_M, 
+  DEFAULT_BUS_DIMENSIONS_MM,
+  DEFAULT_ANTENNA_DIMENSIONS_M, 
+  DEFAULT_ANTENNA_GAP_M, 
+  DEFAULT_ANTENNA_ORIENTATION,
+  DEFAULT_SATELLITE_INFO,
+  POSITION_VALIDATION
+} from './constants.js';
+import { setCameraToEntityHorizontal } from './_util/camera-manager.js';
 
 /**
  * SatelliteSettings - Satellite settings tab management class
@@ -36,45 +49,12 @@ export class SatelliteSettings {
     // 폼 렌더링 후 기본값으로 엔티티 자동 생성 및 카메라 이동
     if (this.viewer && this.busPayloadManager) {
       // Cesium 초기 카메라 애니메이션이 완료될 때까지 기다린 후 엔티티 생성
-      this.waitForCameraReady(() => {
+      waitForCameraReady(this.viewer, () => {
         this.createInitialEntity();
       });
     }
   }
 
-  /**
-   * 카메라가 준비될 때까지 대기 (초기 애니메이션 완료 대기)
-   */
-  private waitForCameraReady(callback: () => void): void {
-    if (!this.viewer) {
-      callback();
-      return;
-    }
-
-    // 카메라 이동이 완료되었는지 확인하는 함수
-    const checkCameraReady = () => {
-      // 카메라가 이동 중인지 확인
-      const isMoving = this.viewer.camera._flight && this.viewer.camera._flight.isActive();
-      
-      if (!isMoving) {
-        // 카메라 이동이 완료되었거나 이동 중이 아니면
-        // 추가로 씬 렌더링이 완료될 때까지 약간 대기
-        setTimeout(() => {
-          console.log('[SatelliteSettings] 카메라 준비 완료, 엔티티 생성 시작');
-          callback();
-        }, 500);
-      } else {
-        // 아직 이동 중이면 다시 확인
-        console.log('[SatelliteSettings] 카메라 이동 대기 중...');
-        setTimeout(checkCameraReady, 200);
-      }
-    };
-
-    // 초기 지연 후 확인 시작 (Cesium 초기화 시간 고려)
-    setTimeout(() => {
-      checkCameraReady();
-    }, 1000);
-  }
 
   /**
    * 초기 엔티티 생성 (탭 접근 시 자동 생성)
@@ -85,77 +65,55 @@ export class SatelliteSettings {
       return;
     }
 
-    console.log('[SatelliteSettings] 초기 엔티티 생성 시작');
-
     // 기본값으로 엔티티 직접 생성
     try {
       // 입력 필드에서 위치 정보 가져오기 (기본값 사용)
-      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || '127.5';
-      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || '37.5';
-      const altInput = (document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || '591';
+      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.LONGITUDE);
+      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.LATITUDE);
+      const altInput = (document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.ALTITUDE_KM);
       
-      const longitude = parseFloat(lonInput) || 127.5;
-      const latitude = parseFloat(latInput) || 37.5;
-      const altitudeKm = parseFloat(altInput) || 591;
+      const longitude = parseFloat(lonInput) || DEFAULT_POSITION.LONGITUDE;
+      const latitude = parseFloat(latInput) || DEFAULT_POSITION.LATITUDE;
+      const altitudeKm = parseFloat(altInput) || DEFAULT_POSITION.ALTITUDE_KM;
       
       // km를 미터로 변환 (Cesium은 미터 단위 사용)
       const altitude = altitudeKm * 1000;
       
-      console.log('[SatelliteSettings] 엔티티 위치:', { longitude, latitude, altitudeKm, altitude });
-      
       this.busPayloadManager.createSatellite(
-        'Satellite-1',
+        DEFAULT_SATELLITE_INFO.NAME,
         { longitude, latitude, altitude },
-        { length: 0.8, width: 0.7, height: 0.84 }, // mm를 미터로 변환: 800mm, 700mm, 840mm
         {
-          height: 0.8,    // 800mm
-          width: 2.41,   // 2410mm
-          depth: 0.1,    // 100mm
-          rollAngle: 0,
-          pitchAngle: 0,
-          yawAngle: 0,
-          initialElevationAngle: 0,
-          initialAzimuthAngle: 0,
+          length: DEFAULT_BUS_DIMENSIONS_M.LENGTH,
+          width: DEFAULT_BUS_DIMENSIONS_M.WIDTH,
+          height: DEFAULT_BUS_DIMENSIONS_M.HEIGHT,
         },
-        0.1 // 100mm (미터 단위)
+        {
+          height: DEFAULT_ANTENNA_DIMENSIONS_M.HEIGHT,
+          width: DEFAULT_ANTENNA_DIMENSIONS_M.WIDTH,
+          depth: DEFAULT_ANTENNA_DIMENSIONS_M.DEPTH,
+          rollAngle: DEFAULT_ANTENNA_ORIENTATION.ROLL,
+          pitchAngle: DEFAULT_ANTENNA_ORIENTATION.PITCH,
+          yawAngle: DEFAULT_ANTENNA_ORIENTATION.YAW,
+          initialElevationAngle: DEFAULT_ANTENNA_ORIENTATION.INITIAL_ELEVATION,
+          initialAzimuthAngle: DEFAULT_ANTENNA_ORIENTATION.INITIAL_AZIMUTH,
+        },
+        DEFAULT_ANTENNA_GAP_M
       );
-
-      console.log('[SatelliteSettings] 초기 엔티티 생성 완료');
 
       // 엔티티 생성 후 약간의 지연을 두고 카메라를 BUS에 고정
       setTimeout(() => {
         const busEntity = this.busPayloadManager?.getBusEntity();
         
         if (busEntity) {
-          console.log('[SatelliteSettings] BUS 엔티티 확인됨, 카메라 위치 설정 시작');
+          // 카메라 각도 설정
+          setupCameraAngle(this.viewer, busEntity);
           
-          const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
-          if (busPosition) {
-            console.log('[SatelliteSettings] BUS 위치:', busPosition);
-            
-            // trackedEntity 해제 (카메라 이동 방해 방지)
-            if (this.viewer.trackedEntity) {
-              console.log('[SatelliteSettings] 기존 trackedEntity 해제');
-              this.viewer.trackedEntity = undefined;
-            }
-            
-            // 카메라 각도 설정
-            setupCameraAngle(this.viewer, busEntity);
-            
-            // Cesium 캔버스가 포커스를 가져가지 않도록 설정
-            const cesiumCanvas = this.viewer?.canvas;
-            if (cesiumCanvas) {
-              cesiumCanvas.setAttribute('tabindex', '-1');
-              cesiumCanvas.style.outline = 'none';
-            }
-            console.log('[SatelliteSettings] 카메라 위치 설정 완료');
-          } else {
-            console.error('[SatelliteSettings] BUS 위치를 가져올 수 없습니다.');
-          }
+          // Cesium 캔버스가 포커스를 가져가지 않도록 설정
+          setupCanvasFocus(this.viewer);
         } else {
           console.error('[SatelliteSettings] BUS 엔티티를 찾을 수 없습니다.');
         }
-      }, 500); // 엔티티 생성 완료 대기 시간
+      }, TIMER.ENTITY_CREATION_DELAY);
     } catch (error) {
       console.error('[SatelliteSettings] 초기 엔티티 생성 오류:', error);
     }
@@ -179,7 +137,7 @@ export class SatelliteSettings {
           if (activeElement && activeElement.tagName !== 'INPUT' && activeElement.id !== this.currentDirectionInputId) {
             this.hideDirectionArrows();
           }
-        }, 200);
+        }, TIMER.INPUT_BLUR_DELAY);
       },
       onInputChange: () => {
         this.updateEntityFromInputs();
@@ -199,7 +157,7 @@ export class SatelliteSettings {
    * 입력 필드 값으로 엔티티 업데이트 (디바운싱 적용)
    */
   private updateEntityFromInputs(): void {
-    // 디바운싱: 입력이 멈춘 후 300ms 후에 업데이트 실행
+    // 디바운싱: 입력이 멈춘 후 일정 시간 후에 업데이트 실행
     if (this.updateDebounceTimer !== null) {
       clearTimeout(this.updateDebounceTimer);
     }
@@ -207,7 +165,7 @@ export class SatelliteSettings {
     this.updateDebounceTimer = window.setTimeout(() => {
       this.performEntityUpdate();
       this.updateDebounceTimer = null;
-    }, 300);
+    }, TIMER.DEBOUNCE_DELAY);
   }
 
   /**
@@ -226,7 +184,7 @@ export class SatelliteSettings {
           if (this.busPayloadManager && this.busPayloadManager.getBusEntity()) {
             this.showDirectionForInput(this.currentDirectionInputId!);
           }
-        }, 100);
+        }, TIMER.INPUT_FOCUS_RESTORE_DELAY);
       }
     }
   }
@@ -240,43 +198,10 @@ export class SatelliteSettings {
     const wasInputFocused = activeElement && activeElement.tagName === 'INPUT' && 
                             activeElement.id && activeElement.id.startsWith('prototype');
 
-    // 엔티티 생성 전 입력 필드 상태 로깅
-    const allInputsBefore = this.container?.querySelectorAll('input');
-    if (allInputsBefore) {
-      console.log('[InputDebug] 엔티티 생성 전 입력 필드 상태:', {
-        totalInputs: allInputsBefore.length,
-        inputs: Array.from(allInputsBefore).map(input => ({
-          id: input.id,
-          disabled: input.disabled,
-          readOnly: input.readOnly,
-          value: input.value,
-          type: input.type
-        }))
-      });
-    }
-
     createSatelliteEntity(this.busPayloadManager, this.viewer, true);
 
     // 엔티티 생성 후 약간의 지연을 두고 카메라를 BUS에 고정
     setTimeout(() => {
-      // 모든 입력 필드의 상태 로깅
-      const allInputs = this.container?.querySelectorAll('input');
-      if (allInputs) {
-        console.log('[InputDebug] 엔티티 생성 후 입력 필드 상태:', {
-          totalInputs: allInputs.length,
-          activeElement: document.activeElement?.id,
-          wasInputFocused,
-          inputs: Array.from(allInputs).map(input => ({
-            id: input.id,
-            disabled: input.disabled,
-            readOnly: input.readOnly,
-            value: input.value,
-            type: input.type,
-            isFocused: document.activeElement === input
-          }))
-        });
-      }
-      
       const busEntity = this.busPayloadManager?.getBusEntity();
       const antennaEntity = this.busPayloadManager?.getAntennaEntity();
       
@@ -293,11 +218,7 @@ export class SatelliteSettings {
       }
       
       // Cesium 캔버스가 포커스를 가져가지 않도록 설정
-      const cesiumCanvas = this.viewer?.canvas;
-      if (cesiumCanvas) {
-        cesiumCanvas.setAttribute('tabindex', '-1');
-        cesiumCanvas.style.outline = 'none';
-      }
+      setupCanvasFocus(this.viewer);
       
       // 포커스 복원: 이전에 입력 필드에 포커스가 있었다면 복원
       if (wasInputFocused && activeElement && activeElement.id) {
@@ -308,11 +229,10 @@ export class SatelliteSettings {
             inputToFocus.focus();
             // 커서를 끝으로 이동
             inputToFocus.setSelectionRange(inputToFocus.value.length, inputToFocus.value.length);
-            console.log(`[InputDebug] 카메라 조작 후 포커스 복원: ${activeElement.id}`);
           }
-        }, 100);
+        }, TIMER.INPUT_FOCUS_RESTORE_DELAY);
       }
-    }, 300); // 엔티티 생성 완료 대기 시간
+    }, TIMER.ENTITY_CREATION_CAMERA_DELAY);
   }
 
 
@@ -325,24 +245,24 @@ export class SatelliteSettings {
       return;
     }
 
-    // 입력된 위치 정보 가져오기 (km를 미터로 변환)
-    const longitude = parseFloat((document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || '0');
-    const latitude = parseFloat((document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || '0');
-    const altitudeKm = parseFloat((document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || '591');
+    // 입력된 위치 정보 가져오기
+    const longitude = parseFloat((document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.LONGITUDE));
+    const latitude = parseFloat((document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.LATITUDE));
+    const altitudeKm = parseFloat((document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || String(DEFAULT_POSITION.ALTITUDE_KM));
     // km를 미터로 변환 (Cesium은 미터 단위 사용)
     const altitude = altitudeKm * 1000;
 
     // 입력값 검증
-    if (longitude < -180 || longitude > 180) {
-      alert('경도는 -180 ~ 180 사이의 값이어야 합니다.');
+    if (longitude < POSITION_VALIDATION.LONGITUDE_MIN || longitude > POSITION_VALIDATION.LONGITUDE_MAX) {
+      alert(`경도는 ${POSITION_VALIDATION.LONGITUDE_MIN} ~ ${POSITION_VALIDATION.LONGITUDE_MAX} 사이의 값이어야 합니다.`);
       return;
     }
-    if (latitude < -90 || latitude > 90) {
-      alert('위도는 -90 ~ 90 사이의 값이어야 합니다.');
+    if (latitude < POSITION_VALIDATION.LATITUDE_MIN || latitude > POSITION_VALIDATION.LATITUDE_MAX) {
+      alert(`위도는 ${POSITION_VALIDATION.LATITUDE_MIN} ~ ${POSITION_VALIDATION.LATITUDE_MAX} 사이의 값이어야 합니다.`);
       return;
     }
-    if (altitudeKm < 0) {
-      alert('고도는 0 이상이어야 합니다.');
+    if (altitudeKm < POSITION_VALIDATION.ALTITUDE_MIN_KM) {
+      alert(`고도는 ${POSITION_VALIDATION.ALTITUDE_MIN_KM} 이상이어야 합니다.`);
       return;
     }
 
@@ -353,34 +273,17 @@ export class SatelliteSettings {
       // 지구로 이동 시 항상 카메라를 엔티티에 고정하고 엔티티 생성 시와 동일한 각도로 설정
       const busEntity = this.busPayloadManager.getBusEntity();
       if (busEntity) {
-        // 기존 trackedEntity 해제 (충돌 방지)
-        this.viewer.trackedEntity = undefined;
+        // BUS 크기 정보 가져오기
+        const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.LENGTH));
+        const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.WIDTH));
+        const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || String(DEFAULT_BUS_DIMENSIONS_MM.HEIGHT));
         
-        // 엔티티 생성 시와 동일한 카메라 각도 설정
-        setTimeout(() => {
-          const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
-          if (busPosition) {
-            // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
-            const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
-            const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
-            const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
-            const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
-            
-            // 대각선에서 바라보는 각도 설정 (엔티티 생성 시와 동일)
-            const cameraRange = Math.max(maxBusSize * 3, 20);
-            
-            // 카메라를 엔티티 생성 시와 동일한 각도로 설정
-            this.viewer.camera.lookAt(
-              busPosition,
-              new Cesium.HeadingPitchRange(
-                Cesium.Math.toRadians(45), // heading: 대각선 방향
-                Cesium.Math.toRadians(0), // pitch: 수평선에 가까운 대각선 뷰
-                cameraRange // range: 거리
-              )
-            );
-            
-          }
-        }, 100);
+        // 카메라 설정
+        setCameraToEntityHorizontal(this.viewer, busEntity, {
+          length: busLengthMm,
+          width: busWidthMm,
+          height: busHeightMm
+        });
       }
 
       alert('위성이 지구로 이동되었습니다.');

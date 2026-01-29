@@ -41,54 +41,6 @@ export function createInputField(
 
   const input = document.createElement('input');
   
-  // 입력 필드 상태 로깅 헬퍼 함수
-  const logInputState = (event: string, details?: any) => {
-    const computedStyle = window.getComputedStyle(input);
-    const rect = input.getBoundingClientRect();
-    const parent = input.parentElement;
-    
-    console.log(`[InputDebug:${id}] ${event}`, {
-      // 기본 상태
-      disabled: input.disabled,
-      readOnly: input.readOnly,
-      value: input.value,
-      selectionStart: input.selectionStart,
-      selectionEnd: input.selectionEnd,
-      isContentEditable: input.isContentEditable,
-      
-      // CSS 상태
-      pointerEvents: computedStyle.pointerEvents,
-      userSelect: computedStyle.userSelect,
-      zIndex: computedStyle.zIndex,
-      position: computedStyle.position,
-      display: computedStyle.display,
-      visibility: computedStyle.visibility,
-      opacity: computedStyle.opacity,
-      
-      // 위치 및 크기
-      boundingRect: {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        top: rect.top,
-        left: rect.left
-      },
-      
-      // 부모 요소 상태
-      parentElement: parent ? {
-        tagName: parent.tagName,
-        id: parent.id,
-        className: parent.className,
-        pointerEvents: window.getComputedStyle(parent).pointerEvents,
-        zIndex: window.getComputedStyle(parent).zIndex
-      } : null,
-      
-      // 추가 정보
-      ...details
-    });
-  };
-  
   // 입력 필드 타입 설정
   input.type = type;
   
@@ -99,14 +51,12 @@ export function createInputField(
     
     // 포커스 이벤트 및 방향 화살표 표시
     input.addEventListener('focus', () => {
-      logInputState('FOCUS');
       if (onFocus) {
         onFocus(id);
       }
     });
     
     input.addEventListener('blur', () => {
-      logInputState('BLUR', { valueBefore: input.value });
       if (onBlur) {
         onBlur(id);
       }
@@ -114,10 +64,6 @@ export function createInputField(
     
     // 다른 입력 필드로 포커스 이동 시에도 화살표 유지
     input.addEventListener('focusin', (e) => {
-      logInputState('FOCUSIN', {
-        relatedTarget: e.relatedTarget,
-        target: e.target === input
-      });
       // 다른 입력 필드로 포커스 이동 시에도 화살표 표시
       if (e.target === input && onFocus) {
         onFocus(id);
@@ -135,64 +81,13 @@ export function createInputField(
     
     // 입력 필드 변경 시 엔티티 업데이트
     input.addEventListener('input', () => {
-      logInputState('INPUT', { value: input.value });
       if (onInput) {
         onInput();
       }
     });
   } else {
-    
-    // 포커스 이벤트 로깅
-    input.addEventListener('focus', () => {
-      logInputState('FOCUS');
-    });
-    
-    input.addEventListener('blur', () => {
-      logInputState('BLUR');
-    });
-    
-    // 마우스 이벤트 로깅
-    input.addEventListener('mousedown', (e) => {
-      logInputState('MOUSEDOWN', {
-        button: e.button,
-        buttons: e.buttons,
-        defaultPrevented: e.defaultPrevented,
-        target: e.target === input
-      });
-      
-      if (e.defaultPrevented) {
-        console.warn(`[InputDebug:${id}] MOUSEDOWN이 preventDefault되었습니다!`, e);
-      }
-    });
-    
-    input.addEventListener('click', (e) => {
-      logInputState('CLICK', {
-        button: e.button,
-        defaultPrevented: e.defaultPrevented,
-        target: e.target === input
-      });
-      
-      if (e.defaultPrevented) {
-        console.warn(`[InputDebug:${id}] CLICK이 preventDefault되었습니다!`, e);
-      }
-    });
-    
-    // 키보드 이벤트 로깅 (일반 입력 필드도)
-    input.addEventListener('keydown', (e) => {
-      logInputState('KEYDOWN', {
-        key: e.key,
-        code: e.code,
-        defaultPrevented: e.defaultPrevented
-      });
-      
-      if (e.defaultPrevented) {
-        console.warn(`[InputDebug:${id}] KEYDOWN이 preventDefault되었습니다!`, e);
-      }
-    });
-    
     // 입력 필드 변경 시 엔티티 업데이트
     input.addEventListener('input', () => {
-      logInputState('INPUT', { value: input.value });
       if (onInput) {
         onInput();
       }
@@ -205,14 +100,6 @@ export function createInputField(
     input.value = defaultValue;
   }
   
-  // 초기 상태 로깅
-  console.log(`[InputDebug:${id}] CREATED`, {
-    type: input.type,
-    defaultValue,
-    disabled: input.disabled,
-    readOnly: input.readOnly,
-    value: input.value
-  });
   input.style.width = '100%';
   input.style.marginTop = '4px';
   input.style.padding = '6px';
