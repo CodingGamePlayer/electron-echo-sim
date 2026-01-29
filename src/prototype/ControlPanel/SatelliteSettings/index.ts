@@ -7,11 +7,19 @@ export class SatelliteSettings {
   private container: HTMLElement | null;
   private viewer: any;
   private busPayloadManager: SatelliteBusPayloadManager | null;
+  private cameraTrackingInterval: number | null;
+  private isCameraTracking: boolean;
+  private cameraTrackingButton: HTMLButtonElement | null;
+  private cameraMoveHandler: any;
 
   constructor() {
     this.container = null;
     this.viewer = null;
     this.busPayloadManager = null;
+    this.cameraTrackingInterval = null;
+    this.isCameraTracking = false;
+    this.cameraTrackingButton = null;
+    this.cameraMoveHandler = null;
   }
 
   /**
@@ -196,6 +204,20 @@ export class SatelliteSettings {
     deleteButton.addEventListener('click', () => this.removeSatelliteEntity());
     buttonSection.appendChild(deleteButton);
 
+    // 카메라 추적 토글 버튼
+    const cameraTrackingButton = document.createElement('button');
+    cameraTrackingButton.textContent = '카메라 추적 OFF';
+    cameraTrackingButton.id = 'prototypeCameraTrackingButton';
+    cameraTrackingButton.style.padding = '10px';
+    cameraTrackingButton.style.backgroundColor = '#666';
+    cameraTrackingButton.style.color = 'white';
+    cameraTrackingButton.style.border = 'none';
+    cameraTrackingButton.style.borderRadius = '4px';
+    cameraTrackingButton.style.cursor = 'pointer';
+    cameraTrackingButton.addEventListener('click', () => this.toggleCameraTracking());
+    this.cameraTrackingButton = cameraTrackingButton;
+    buttonSection.appendChild(cameraTrackingButton);
+
     // XYZ 축 표시/숨김 토글
     const axisToggleLabel = document.createElement('label');
     axisToggleLabel.style.display = 'flex';
@@ -274,8 +296,135 @@ export class SatelliteSettings {
       input.step = 'any';
     }
 
+    // 입력 필드 변경 시 엔티티 업데이트
+    input.addEventListener('input', () => {
+      this.updateEntityFromInputs();
+    });
+
     label.appendChild(input);
     return label;
+  }
+
+  /**
+   * 입력 필드 값으로 엔티티 업데이트
+   */
+  private updateEntityFromInputs(): void {
+    if (!this.busPayloadManager || !this.viewer) {
+      return;
+    }
+
+    // 엔티티가 생성되어 있는지 확인
+    const busEntity = this.busPayloadManager.getBusEntity();
+    const antennaEntity = this.busPayloadManager.getAntennaEntity();
+    
+    if (!busEntity && !antennaEntity) {
+      // 엔티티가 없으면 업데이트하지 않음
+      return;
+    }
+
+    // 카메라 추적 중이 아닐 때는 카메라가 자동으로 이동하지 않도록 설정
+    // trackedEntity를 일시적으로 해제하여 엔티티 업데이트 시 카메라 이동 방지
+    // 추적 상태와 관계없이 항상 해제하여 카메라 이동 방지
+    const wasTracking = this.isCameraTracking;
+    const previousTrackedEntity = this.viewer.trackedEntity;
+    this.viewer.trackedEntity = undefined;
+
+    try {
+      // 위치 정보 가져오기 및 검증
+      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value;
+      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value;
+      const altInput = (document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value;
+
+      if (lonInput && latInput && altInput) {
+        const longitude = parseFloat(lonInput);
+        const latitude = parseFloat(latInput);
+        const altitude = parseFloat(altInput);
+
+        // 입력값 검증 (NaN 체크 포함)
+        if (!isNaN(longitude) && !isNaN(latitude) && !isNaN(altitude) &&
+            longitude >= -180 && longitude <= 180 && 
+            latitude >= -90 && latitude <= 90 && 
+            altitude >= 0) {
+          this.busPayloadManager.updatePosition({ longitude, latitude, altitude });
+        }
+      }
+
+      // BUS 크기 가져오기 및 검증
+      const busLengthInput = (document.getElementById('prototypeBusLength') as HTMLInputElement)?.value;
+      const busWidthInput = (document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value;
+      const busHeightInput = (document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value;
+
+      if (busLengthInput && busWidthInput && busHeightInput) {
+        const busLength = parseFloat(busLengthInput);
+        const busWidth = parseFloat(busWidthInput);
+        const busHeight = parseFloat(busHeightInput);
+
+        if (!isNaN(busLength) && !isNaN(busWidth) && !isNaN(busHeight) &&
+            busLength > 0 && busWidth > 0 && busHeight > 0) {
+          this.busPayloadManager.updateBusDimensions({
+            length: busLength,
+            width: busWidth,
+            height: busHeight
+          });
+        }
+      }
+
+      // 안테나 크기 가져오기 및 검증
+      const antennaHeightInput = (document.getElementById('prototypeAntennaHeight') as HTMLInputElement)?.value;
+      const antennaWidthInput = (document.getElementById('prototypeAntennaWidth') as HTMLInputElement)?.value;
+      const antennaDepthInput = (document.getElementById('prototypeAntennaDepth') as HTMLInputElement)?.value;
+
+      if (antennaHeightInput && antennaWidthInput && antennaDepthInput) {
+        const antennaHeight = parseFloat(antennaHeightInput);
+        const antennaWidth = parseFloat(antennaWidthInput);
+        const antennaDepth = parseFloat(antennaDepthInput);
+
+        if (!isNaN(antennaHeight) && !isNaN(antennaWidth) && !isNaN(antennaDepth) &&
+            antennaHeight > 0 && antennaWidth > 0 && antennaDepth > 0) {
+          this.busPayloadManager.updateAntennaDimensions({
+            height: antennaHeight,
+            width: antennaWidth,
+            depth: antennaDepth
+          });
+        }
+      }
+
+      // 안테나 방향 가져오기 및 검증
+      const antennaRollInput = (document.getElementById('prototypeAntennaRoll') as HTMLInputElement)?.value;
+      const antennaPitchInput = (document.getElementById('prototypeAntennaPitch') as HTMLInputElement)?.value;
+      const antennaYawInput = (document.getElementById('prototypeAntennaYaw') as HTMLInputElement)?.value;
+      const antennaElevationInput = (document.getElementById('prototypeAntennaElevation') as HTMLInputElement)?.value;
+      const antennaAzimuthInput = (document.getElementById('prototypeAntennaAzimuth') as HTMLInputElement)?.value;
+
+      if (antennaRollInput !== undefined && antennaPitchInput !== undefined && antennaYawInput !== undefined &&
+          antennaElevationInput !== undefined && antennaAzimuthInput !== undefined) {
+        const antennaRoll = parseFloat(antennaRollInput || '0');
+        const antennaPitch = parseFloat(antennaPitchInput || '0');
+        const antennaYaw = parseFloat(antennaYawInput || '0');
+        const antennaElevation = parseFloat(antennaElevationInput || '0');
+        const antennaAzimuth = parseFloat(antennaAzimuthInput || '0');
+
+        // NaN 체크 (방향은 0도가 기본값이므로 항상 업데이트 가능)
+        if (!isNaN(antennaRoll) && !isNaN(antennaPitch) && !isNaN(antennaYaw) &&
+            !isNaN(antennaElevation) && !isNaN(antennaAzimuth)) {
+          this.busPayloadManager.updateAntennaOrientation({
+            rollAngle: antennaRoll,
+            pitchAngle: antennaPitch,
+            yawAngle: antennaYaw,
+            initialElevationAngle: antennaElevation,
+            initialAzimuthAngle: antennaAzimuth
+          });
+        }
+      }
+    } catch (error) {
+      // 입력값 파싱 오류는 무시 (사용자가 입력 중일 수 있음)
+      console.debug('[SatelliteSettings] 엔티티 업데이트 중 오류 (무시됨):', error);
+    } finally {
+      // 카메라 추적이 활성화되어 있었다면 복원
+      if (wasTracking && previousTrackedEntity) {
+        this.viewer.trackedEntity = previousTrackedEntity;
+      }
+    }
   }
 
   /**
@@ -360,67 +509,28 @@ export class SatelliteSettings {
         }
       );
 
-      // 엔티티 생성 후 약간의 지연을 두고 카메라 이동
+      // 엔티티 생성 후 약간의 지연을 두고 카메라를 BUS에 고정
       setTimeout(() => {
-        // 위성 위치
-        const satellitePosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, spaceAltitude);
+        const busEntity = this.busPayloadManager?.getBusEntity();
+        const antennaEntity = this.busPayloadManager?.getAntennaEntity();
         
-        // 모델의 최대 크기 계산
-        const maxModelSize = Math.max(busLength, busWidth, busHeight, antennaHeight, antennaWidth);
+        console.log('[SatelliteSettings] 엔티티 확인:', {
+          busEntity: !!busEntity,
+          antennaEntity: !!antennaEntity,
+          busEntityId: busEntity?.id,
+          antennaEntityId: antennaEntity?.id
+        });
         
-        // 카메라를 위성에서 적절한 거리에 배치
-        // 모델 크기의 5배 거리로 설정
-        const offsetDistance = Math.max(maxModelSize * 5, 50); // 최소 50미터
-        
-        // 위성의 동쪽 방향으로 오프셋 계산
-        const cartographic = Cesium.Cartographic.fromCartesian(satellitePosition);
-        
-        // 로컬 좌표계 계산 (동쪽, 북쪽, 위쪽)
-        const east = new Cesium.Cartesian3(-Math.sin(cartographic.longitude), Math.cos(cartographic.longitude), 0);
-        const up = Cesium.Cartesian3.normalize(satellitePosition, new Cesium.Cartesian3());
-        
-        // 카메라 위치 계산 (동쪽으로 offsetDistance만큼 이동, 약간 위쪽)
-        const cameraOffset = Cesium.Cartesian3.add(
-          Cesium.Cartesian3.multiplyByScalar(east, offsetDistance, new Cesium.Cartesian3()),
-          Cesium.Cartesian3.multiplyByScalar(up, offsetDistance * 0.3, new Cesium.Cartesian3()),
-          new Cesium.Cartesian3()
-        );
-        const cameraPosition = Cesium.Cartesian3.add(satellitePosition, cameraOffset, new Cesium.Cartesian3());
+        // 엔티티가 생성되었는지 확인
+        if (!busEntity && !antennaEntity) {
+          console.error('[SatelliteSettings] 엔티티가 생성되지 않았습니다!');
+          alert('엔티티 생성에 실패했습니다. 콘솔을 확인하세요.');
+          return;
+        }
 
-        // lookAt을 사용하여 위성을 화면 중앙에 정확히 배치 (즉시 이동)
-        // lookAt은 target(위성 위치)과 offset(카메라 오프셋)을 사용
-        this.viewer.camera.lookAt(
-          satellitePosition,
-          new Cesium.HeadingPitchRange(
-            Cesium.Math.toRadians(0), // heading: 동쪽 방향
-            Cesium.Math.toRadians(-0.3), // pitch: 약간 아래를 보도록
-            offsetDistance // range: 거리
-          )
-        );
-
-        // 엔티티 확인
-        setTimeout(() => {
-          const busEntity = this.busPayloadManager?.getBusEntity();
-          const antennaEntity = this.busPayloadManager?.getAntennaEntity();
-          
-          console.log('[SatelliteSettings] 엔티티 확인:', {
-            busEntity: !!busEntity,
-            antennaEntity: !!antennaEntity,
-            busEntityId: busEntity?.id,
-            antennaEntityId: antennaEntity?.id,
-            cameraPosition: this.viewer.camera.position,
-            satellitePosition: satellitePosition,
-            distance: Cesium.Cartesian3.distance(this.viewer.camera.position, satellitePosition),
-            maxModelSize: maxModelSize
-          });
-          
-          // 엔티티가 생성되었는지 확인
-          if (!busEntity && !antennaEntity) {
-            console.error('[SatelliteSettings] 엔티티가 생성되지 않았습니다!');
-            alert('엔티티 생성에 실패했습니다. 콘솔을 확인하세요.');
-            return;
-          }
-        }, 100); // 엔티티 생성 확인 대기
+      // BUS 엔티티에 카메라 고정 및 대각선 뷰 설정 (자동으로 시작하지 않음)
+      // 사용자가 카메라 추적 버튼을 눌러야 추적 시작
+      console.log('[SatelliteSettings] 위성 엔티티 생성 완료. 카메라 추적 버튼을 눌러 추적을 시작할 수 있습니다.');
       }, 300); // 엔티티 생성 완료 대기 시간
 
       console.log('[SatelliteSettings] 위성 엔티티 생성 완료 (우주 공간)');
@@ -439,6 +549,10 @@ export class SatelliteSettings {
       alert('Cesium 뷰어가 초기화되지 않았습니다.');
       return;
     }
+
+    // 카메라 추적 해제
+    this.stopCameraTracking();
+    console.log('[SatelliteSettings] 카메라 추적 해제 완료');
 
     this.busPayloadManager.removeSatellite();
     console.log('[SatelliteSettings] 위성 엔티티 제거 완료');
@@ -476,37 +590,9 @@ export class SatelliteSettings {
       // 위성 위치 업데이트
       this.busPayloadManager.updatePosition({ longitude, latitude, altitude });
 
-      // 카메라를 지구 위성 위치로 이동
-      const satellitePosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, altitude);
-      
-      // BUS 크기 정보 가져오기 (기본값 사용)
-      const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
-      const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
-      const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
-      const antennaHeight = parseFloat((document.getElementById('prototypeAntennaHeight') as HTMLInputElement)?.value || '3');
-      const antennaWidth = parseFloat((document.getElementById('prototypeAntennaWidth') as HTMLInputElement)?.value || '5');
-      
-      // 모델의 최대 크기 계산
-      const maxModelSize = Math.max(busLength, busWidth, busHeight, antennaHeight, antennaWidth);
-      
-      // 위성에서 매우 가까운 거리에 카메라 배치
-      const offsetDistance = Math.max(maxModelSize * 2.5, 20); // 최소 20미터, 모델 크기의 2.5배
-      const cartographic = Cesium.Cartographic.fromCartesian(satellitePosition);
-      const cameraPosition = Cesium.Cartesian3.fromRadians(
-        cartographic.longitude + Cesium.Math.toRadians(0.001),
-        cartographic.latitude,
-        cartographic.height + offsetDistance
-      );
-
-      // 즉시 카메라 이동 (애니메이션 없음)
-      this.viewer.camera.lookAt(
-        satellitePosition,
-        new Cesium.HeadingPitchRange(
-          Cesium.Math.toRadians(0), // heading: 동쪽 방향
-          Cesium.Math.toRadians(-0.3), // pitch: 약간 아래를 보도록
-          offsetDistance // range: 거리
-        )
-      );
+      // BUS 엔티티 위치 업데이트 완료
+      // 카메라 추적이 활성화되어 있으면 자동으로 업데이트됨
+      console.log('[SatelliteSettings] 위성을 지구로 이동 완료');
 
       console.log('[SatelliteSettings] 위성을 지구로 이동 완료');
       alert('위성이 지구로 이동되었습니다.');
@@ -529,9 +615,166 @@ export class SatelliteSettings {
   }
 
   /**
+   * 카메라 추적 토글
+   */
+  private toggleCameraTracking(): void {
+    const busEntity = this.busPayloadManager?.getBusEntity();
+    if (!busEntity) {
+      alert('위성 엔티티가 생성되지 않았습니다. 먼저 위성 엔티티를 생성하세요.');
+      return;
+    }
+
+    if (this.isCameraTracking) {
+      this.stopCameraTracking();
+    } else {
+      this.startCameraTracking(busEntity);
+    }
+  }
+
+  /**
+   * 카메라 추적 시작 (대각선 뷰 유지)
+   */
+  private startCameraTracking(busEntity: any): void {
+    // 기존 추적 중지
+    this.stopCameraTracking();
+
+    this.isCameraTracking = true;
+
+    // 버튼 상태 업데이트
+    if (this.cameraTrackingButton) {
+      this.cameraTrackingButton.textContent = '카메라 추적 ON';
+      this.cameraTrackingButton.style.backgroundColor = '#4CAF50';
+    }
+
+    // 사용자가 카메라를 조작하면 추적 자동 해제
+    this.setupCameraMoveHandler();
+
+    // trackedEntity를 사용하지 않고 주기적으로 lookAt 호출
+    const updateCamera = () => {
+      if (!busEntity || !this.viewer || !this.isCameraTracking) {
+        return;
+      }
+
+      const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
+      if (busPosition) {
+        // BUS 크기 정보로 적절한 거리 계산
+        const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
+        const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
+        const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
+        const maxBusSize = Math.max(busLength, busWidth, busHeight);
+        
+        // 대각선에서 바라보는 각도 설정
+        const cameraRange = Math.max(maxBusSize * 3, 20);
+        
+        this.viewer.camera.lookAt(
+          busPosition,
+          new Cesium.HeadingPitchRange(
+            Cesium.Math.toRadians(45), // heading: 대각선 방향
+            Cesium.Math.toRadians(0), // pitch: 수평선에 가까운 대각선 뷰
+            cameraRange // range: 거리
+          )
+        );
+      }
+    };
+
+    // 즉시 한 번 실행
+    updateCamera();
+    
+    // 주기적으로 카메라 업데이트 (100ms마다)
+    this.cameraTrackingInterval = window.setInterval(updateCamera, 100);
+  }
+
+  /**
+   * 카메라 이동 감지 핸들러 설정
+   * 사용자가 카메라를 조작하면 추적을 자동으로 해제
+   */
+  private setupCameraMoveHandler(): void {
+    if (!this.viewer || this.cameraMoveHandler) {
+      return;
+    }
+
+    let isUserInteracting = false;
+    let interactionTimeout: number | null = null;
+
+    // 마우스 이벤트로 사용자 상호작용 감지
+    const onMouseDown = () => {
+      isUserInteracting = true;
+    };
+
+    const onMouseUp = () => {
+      isUserInteracting = false;
+      // 마우스를 놓은 후 잠시 대기 (드래그 완료 대기)
+      if (interactionTimeout) {
+        clearTimeout(interactionTimeout);
+      }
+      interactionTimeout = window.setTimeout(() => {
+        if (!isUserInteracting && this.isCameraTracking) {
+          // 사용자가 카메라를 조작했으므로 추적 해제
+          this.stopCameraTracking();
+          console.log('[SatelliteSettings] 사용자가 카메라를 조작하여 추적이 자동으로 해제되었습니다.');
+        }
+      }, 100);
+    };
+
+    const onWheel = () => {
+      if (this.isCameraTracking) {
+        this.stopCameraTracking();
+        console.log('[SatelliteSettings] 사용자가 카메라를 조작하여 추적이 자동으로 해제되었습니다.');
+      }
+    };
+
+    this.viewer.canvas.addEventListener('mousedown', onMouseDown);
+    this.viewer.canvas.addEventListener('mouseup', onMouseUp);
+    this.viewer.canvas.addEventListener('wheel', onWheel);
+
+    this.cameraMoveHandler = {
+      onMouseDown,
+      onMouseUp,
+      onWheel,
+      cleanup: () => {
+        this.viewer.canvas.removeEventListener('mousedown', onMouseDown);
+        this.viewer.canvas.removeEventListener('mouseup', onMouseUp);
+        this.viewer.canvas.removeEventListener('wheel', onWheel);
+        if (interactionTimeout) {
+          clearTimeout(interactionTimeout);
+        }
+      }
+    };
+  }
+
+  /**
+   * 카메라 추적 중지
+   */
+  private stopCameraTracking(): void {
+    this.isCameraTracking = false;
+    if (this.cameraTrackingInterval !== null) {
+      clearInterval(this.cameraTrackingInterval);
+      this.cameraTrackingInterval = null;
+    }
+    if (this.viewer) {
+      this.viewer.trackedEntity = undefined;
+    }
+
+    // 버튼 상태 업데이트
+    if (this.cameraTrackingButton) {
+      this.cameraTrackingButton.textContent = '카메라 추적 OFF';
+      this.cameraTrackingButton.style.backgroundColor = '#666';
+    }
+
+    // 카메라 이동 핸들러 정리
+    if (this.cameraMoveHandler) {
+      this.cameraMoveHandler.cleanup();
+      this.cameraMoveHandler = null;
+    }
+  }
+
+  /**
    * Cleanup satellite settings
    */
   cleanup(): void {
+    // 카메라 추적 해제
+    this.stopCameraTracking();
+
     if (this.busPayloadManager) {
       this.busPayloadManager.removeSatellite();
       this.busPayloadManager = null;
@@ -541,5 +784,6 @@ export class SatelliteSettings {
     }
     this.container = null;
     this.viewer = null;
+    this.cameraTrackingButton = null;
   }
 }

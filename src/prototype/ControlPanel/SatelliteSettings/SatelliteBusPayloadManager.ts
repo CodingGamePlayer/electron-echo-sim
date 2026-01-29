@@ -1,3 +1,7 @@
+import { calculateBaseAxes } from './_util/base-axes-calculator.js';
+import { calculateAntennaOrientation } from './_util/antenna-orientation-calculator.js';
+import { getAxisLinePositions, getAxisEndPosition } from './_util/axis-position-calculator.js';
+
 /**
  * SatelliteBusPayloadManager - BUS와 Payload(안테나) 엔티티 관리 클래스
  */
@@ -89,7 +93,7 @@ export class SatelliteBusPayloadManager {
     this.antennaParams = antennaParams;
 
     // BUS 기본 방향 계산
-    const busAxes = this.calculateBaseAxes();
+    const busAxes = calculateBaseAxes(this.currentCartesian);
     if (!busAxes) {
       console.error('[SatelliteBusPayloadManager] BUS 축 계산 실패');
       return;
@@ -143,7 +147,7 @@ export class SatelliteBusPayloadManager {
       const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
 
       // 안테나 방향 계산
-      const antennaOrientation = this.calculateAntennaOrientation(
+      const antennaOrientation = calculateAntennaOrientation(
         busAxes,
         antennaParams.rollAngle,
         antennaParams.pitchAngle,
@@ -185,172 +189,6 @@ export class SatelliteBusPayloadManager {
     }
   }
 
-  /**
-   * 안테나 방향 계산
-   * 안테나의 넓은 면(width x height)이 BUS를 바라보도록 기본 방향 설정
-   */
-  private calculateAntennaOrientation(
-    busAxes: { xAxis: any; yAxis: any; zAxis: any },
-    rollAngle: number,
-    pitchAngle: number,
-    yawAngle: number,
-    elevationAngle: number,
-    azimuthAngle: number
-  ): any {
-    // 각도를 라디안으로 변환
-    const rollRad = Cesium.Math.toRadians(rollAngle);
-    const pitchRad = Cesium.Math.toRadians(pitchAngle);
-    const yawRad = Cesium.Math.toRadians(yawAngle);
-    const elevationRad = Cesium.Math.toRadians(elevationAngle);
-    const azimuthRad = Cesium.Math.toRadians(azimuthAngle);
-
-    // 안테나의 기본 방향: 넓은 면(width x height)이 BUS를 향하도록
-    // 안테나의 Y축이 BUS의 -Y축 방향을 향하도록 회전
-    // Cesium Box의 dimensions: (depth, width, height) = (X, Y, Z)
-    // 넓은 면은 Y-Z 평면이므로, 안테나의 -Y축이 BUS를 향해야 함
-
-    // 1. 기본 방향: 안테나의 -Y축이 BUS의 -Y축 방향을 향하도록
-    // BUS의 -Y축 방향 벡터
-    const busNegativeYAxis = Cesium.Cartesian3.negate(busAxes.yAxis, new Cesium.Cartesian3());
-    
-    // 안테나의 기본 Y축 (안테나 로컬 좌표계에서 Y축은 width 방향)
-    // 안테나가 BUS의 Y축 방향에 위치하므로, 안테나의 -Y축이 BUS를 향하도록
-    // 기본적으로 안테나의 Y축을 BUS의 -Y축과 정렬
-    const antennaBaseYAxis = busNegativeYAxis;
-
-    // 안테나의 기본 X축 (depth 방향)은 BUS의 X축과 정렬
-    const antennaBaseXAxis = busAxes.xAxis;
-    
-    // 안테나의 기본 Z축 (height 방향)은 외적으로 계산
-    const antennaBaseZAxis = Cesium.Cartesian3.cross(
-      antennaBaseXAxis,
-      antennaBaseYAxis,
-      new Cesium.Cartesian3()
-    );
-    const antennaBaseZAxisNormalized = Cesium.Cartesian3.normalize(antennaBaseZAxis, new Cesium.Cartesian3());
-    
-    // X축 재계산 (Y × Z로 정규화 보정)
-    const antennaBaseXAxisCorrected = Cesium.Cartesian3.cross(
-      antennaBaseYAxis,
-      antennaBaseZAxisNormalized,
-      new Cesium.Cartesian3()
-    );
-    const antennaBaseXAxisNormalized = Cesium.Cartesian3.normalize(antennaBaseXAxisCorrected, new Cesium.Cartesian3());
-
-    // 기본 방향 쿼터니언 계산 (로컬 좌표계를 ECEF 좌표계로 변환)
-    const baseRotationMatrix = new Cesium.Matrix3(
-      antennaBaseXAxisNormalized.x, antennaBaseYAxis.x, antennaBaseZAxisNormalized.x,
-      antennaBaseXAxisNormalized.y, antennaBaseYAxis.y, antennaBaseZAxisNormalized.y,
-      antennaBaseXAxisNormalized.z, antennaBaseYAxis.z, antennaBaseZAxisNormalized.z
-    );
-    const baseOrientation = Cesium.Quaternion.fromRotationMatrix(baseRotationMatrix, new Cesium.Quaternion());
-
-    // 2. 안테나의 roll/pitch/yaw 회전 적용
-    // 안테나 로컬 좌표계 기준 회전
-    const yawQuaternion = Cesium.Quaternion.fromAxisAngle(antennaBaseZAxisNormalized, yawRad, new Cesium.Quaternion());
-    const yawMatrix = Cesium.Matrix3.fromQuaternion(yawQuaternion, new Cesium.Matrix3());
-    const yAxisAfterYaw = Cesium.Matrix3.multiplyByVector(
-      yawMatrix,
-      antennaBaseYAxis,
-      new Cesium.Cartesian3()
-    );
-
-    const pitchQuaternion = Cesium.Quaternion.fromAxisAngle(yAxisAfterYaw, pitchRad, new Cesium.Quaternion());
-    const yawPitchQuaternion = Cesium.Quaternion.multiply(
-      pitchQuaternion,
-      yawQuaternion,
-      new Cesium.Quaternion()
-    );
-    const yawPitchMatrix = Cesium.Matrix3.fromQuaternion(yawPitchQuaternion, new Cesium.Matrix3());
-    const xAxisAfterYawPitch = Cesium.Matrix3.multiplyByVector(
-      yawPitchMatrix,
-      antennaBaseXAxisNormalized,
-      new Cesium.Cartesian3()
-    );
-
-    const rollQuaternion = Cesium.Quaternion.fromAxisAngle(xAxisAfterYawPitch, rollRad, new Cesium.Quaternion());
-    const rollPitchYawQuaternion = Cesium.Quaternion.multiply(
-      rollQuaternion,
-      yawPitchQuaternion,
-      new Cesium.Quaternion()
-    );
-
-    // 3. 초기 elevation/azimuth 각도 적용
-    // Elevation: Y축 기준 회전
-    // Azimuth: Z축 기준 회전
-    const elevationQuaternion = Cesium.Quaternion.fromAxisAngle(
-      yAxisAfterYaw,
-      elevationRad,
-      new Cesium.Quaternion()
-    );
-    const azimuthQuaternion = Cesium.Quaternion.fromAxisAngle(
-      antennaBaseZAxisNormalized,
-      azimuthRad,
-      new Cesium.Quaternion()
-    );
-
-    // 최종 회전: Azimuth * Elevation * Roll * Pitch * Yaw * Base
-    const elevationAzimuthQuaternion = Cesium.Quaternion.multiply(
-      azimuthQuaternion,
-      elevationQuaternion,
-      new Cesium.Quaternion()
-    );
-
-    const finalRotation = Cesium.Quaternion.multiply(
-      elevationAzimuthQuaternion,
-      rollPitchYawQuaternion,
-      new Cesium.Quaternion()
-    );
-
-    return Cesium.Quaternion.multiply(
-      finalRotation,
-      baseOrientation,
-      new Cesium.Quaternion()
-    );
-  }
-
-  /**
-   * 위성의 로컬 좌표계 기본 축 계산
-   */
-  private calculateBaseAxes(): { xAxis: any; yAxis: any; zAxis: any } | null {
-    if (!this.currentCartesian) {
-      return null;
-    }
-
-    // Z축: 지구 중심 방향
-    const zAxis = Cesium.Cartesian3.negate(
-      Cesium.Cartesian3.normalize(this.currentCartesian, new Cesium.Cartesian3()),
-      new Cesium.Cartesian3()
-    );
-
-    // X축: 동쪽 방향 근사
-    const cartographic = Cesium.Cartographic.fromCartesian(this.currentCartesian);
-    const lon = cartographic.longitude;
-    const xAxis = new Cesium.Cartesian3(Math.sin(lon), -Math.cos(lon), 0);
-    const xAxisNormalized = Cesium.Cartesian3.normalize(xAxis, new Cesium.Cartesian3());
-
-    // Y축: X × Z (외적)
-    const yAxis = Cesium.Cartesian3.cross(
-      xAxisNormalized,
-      zAxis,
-      new Cesium.Cartesian3()
-    );
-    const yAxisNormalized = Cesium.Cartesian3.normalize(yAxis, new Cesium.Cartesian3());
-
-    // X축 재계산 (Y × Z로 정규화 보정)
-    const xAxisCorrected = Cesium.Cartesian3.cross(
-      yAxisNormalized,
-      zAxis,
-      new Cesium.Cartesian3()
-    );
-    const xAxisFinal = Cesium.Cartesian3.normalize(xAxisCorrected, new Cesium.Cartesian3());
-
-    return {
-      xAxis: xAxisFinal,
-      yAxis: yAxisNormalized,
-      zAxis: zAxis,
-    };
-  }
 
   /**
    * XYZ 축 방향선 생성
@@ -363,7 +201,7 @@ export class SatelliteBusPayloadManager {
       name: 'X-Axis (Satellite Velocity)',
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
-          return this.getAxisLinePositions('x');
+          return getAxisLinePositions(this.currentCartesian, 'x', this.axisLength);
         }, false),
         width: 3,
         material: Cesium.Color.RED,
@@ -377,7 +215,7 @@ export class SatelliteBusPayloadManager {
       name: 'Y-Axis (SAR Look Direction)',
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
-          return this.getAxisLinePositions('y');
+          return getAxisLinePositions(this.currentCartesian, 'y', this.axisLength);
         }, false),
         width: 3,
         material: Cesium.Color.GREEN,
@@ -391,7 +229,7 @@ export class SatelliteBusPayloadManager {
       name: 'Z-Axis (Earth Center Direction)',
       polyline: {
         positions: new Cesium.CallbackProperty(() => {
-          return this.getAxisLinePositions('z');
+          return getAxisLinePositions(this.currentCartesian, 'z', this.axisLength);
         }, false),
         width: 3,
         material: Cesium.Color.BLUE,
@@ -404,7 +242,7 @@ export class SatelliteBusPayloadManager {
     const xLabelEntity = this.viewer.entities.add({
       name: 'X-Axis Label',
       position: new Cesium.CallbackProperty(() => {
-        return this.getAxisEndPosition('x');
+        return getAxisEndPosition(this.currentCartesian, 'x', this.axisLength);
       }, false),
       label: {
         text: 'X',
@@ -426,7 +264,7 @@ export class SatelliteBusPayloadManager {
     const yLabelEntity = this.viewer.entities.add({
       name: 'Y-Axis Label',
       position: new Cesium.CallbackProperty(() => {
-        return this.getAxisEndPosition('y');
+        return getAxisEndPosition(this.currentCartesian, 'y', this.axisLength);
       }, false),
       label: {
         text: 'Y',
@@ -448,7 +286,7 @@ export class SatelliteBusPayloadManager {
     const zLabelEntity = this.viewer.entities.add({
       name: 'Z-Axis Label',
       position: new Cesium.CallbackProperty(() => {
-        return this.getAxisEndPosition('z');
+        return getAxisEndPosition(this.currentCartesian, 'z', this.axisLength);
       }, false),
       label: {
         text: 'Z',
@@ -476,91 +314,6 @@ export class SatelliteBusPayloadManager {
     };
   }
 
-  /**
-   * 축 방향선 위치 계산
-   */
-  private getAxisLinePositions(axis: 'x' | 'y' | 'z'): any[] {
-    if (!this.currentCartesian) {
-      return [];
-    }
-
-    const axes = this.calculateBaseAxes();
-    if (!axes) {
-      return [];
-    }
-
-    const start = this.currentCartesian;
-    let direction: any;
-
-    switch (axis) {
-      case 'x':
-        direction = axes.xAxis;
-        break;
-      case 'y':
-        direction = axes.yAxis;
-        break;
-      case 'z':
-        direction = axes.zAxis;
-        break;
-      default:
-        return [];
-    }
-
-    // 방향 벡터 정규화 및 스케일링
-    const normalized = Cesium.Cartesian3.normalize(direction, new Cesium.Cartesian3());
-    const scaled = Cesium.Cartesian3.multiplyByScalar(
-      normalized,
-      this.axisLength,
-      new Cesium.Cartesian3()
-    );
-
-    // 끝점 계산
-    const end = Cesium.Cartesian3.add(start, scaled, new Cesium.Cartesian3());
-
-    return [start, end];
-  }
-
-  /**
-   * 축 끝점 위치 계산 (레이블용)
-   */
-  private getAxisEndPosition(axis: 'x' | 'y' | 'z'): any | undefined {
-    if (!this.currentCartesian) {
-      return undefined;
-    }
-
-    const axes = this.calculateBaseAxes();
-    if (!axes) {
-      return undefined;
-    }
-
-    const start = this.currentCartesian;
-    let direction: any;
-
-    switch (axis) {
-      case 'x':
-        direction = axes.xAxis;
-        break;
-      case 'y':
-        direction = axes.yAxis;
-        break;
-      case 'z':
-        direction = axes.zAxis;
-        break;
-      default:
-        return undefined;
-    }
-
-    // 방향 벡터 정규화 및 스케일링
-    const normalized = Cesium.Cartesian3.normalize(direction, new Cesium.Cartesian3());
-    const scaled = Cesium.Cartesian3.multiplyByScalar(
-      normalized,
-      this.axisLength,
-      new Cesium.Cartesian3()
-    );
-
-    // 끝점 계산
-    return Cesium.Cartesian3.add(start, scaled, new Cesium.Cartesian3());
-  }
 
   /**
    * 위성 위치 업데이트
@@ -576,56 +329,219 @@ export class SatelliteBusPayloadManager {
       return;
     }
 
-    const newCartesian = Cesium.Cartesian3.fromDegrees(
-      position.longitude,
-      position.latitude,
-      position.altitude
-    );
-
-    this.currentCartesian = newCartesian.clone();
-    this.position.setValue(newCartesian);
-
-    // BUS 방향 재계산
-    const busAxes = this.calculateBaseAxes();
-    if (busAxes) {
-      const busOrientation = Cesium.Transforms.headingPitchRollQuaternion(
-        newCartesian,
-        new Cesium.HeadingPitchRoll(0, 0, 0)
+    try {
+      const newCartesian = Cesium.Cartesian3.fromDegrees(
+        position.longitude,
+        position.latitude,
+        position.altitude
       );
 
-      if (this.busEntity) {
-        this.busEntity.orientation = new Cesium.ConstantProperty(busOrientation);
+      this.currentCartesian = newCartesian.clone();
+      this.position.setValue(newCartesian);
+
+      // BUS 방향 재계산
+      const busAxes = calculateBaseAxes(this.currentCartesian);
+      if (busAxes) {
+        const busOrientation = Cesium.Transforms.headingPitchRollQuaternion(
+          newCartesian,
+          new Cesium.HeadingPitchRoll(0, 0, 0)
+        );
+
+        if (this.busEntity) {
+          this.busEntity.orientation = new Cesium.ConstantProperty(busOrientation);
+        }
+
+        // 안테나 위치 재계산
+        if (this.antennaEntity && this.antennaParams) {
+          const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
+            busAxes.yAxis,
+            this.busDimensions.width / 2 + this.antennaParams.depth / 2 + 1,
+            new Cesium.Cartesian3()
+          );
+          const antennaPosition = Cesium.Cartesian3.add(
+            this.currentCartesian,
+            antennaOffset,
+            new Cesium.Cartesian3()
+          );
+          const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
+          this.antennaEntity.position = antennaPositionProperty;
+
+          // 안테나 방향도 재계산
+          const antennaOrientation = calculateAntennaOrientation(
+            busAxes,
+            this.antennaParams.rollAngle,
+            this.antennaParams.pitchAngle,
+            this.antennaParams.yawAngle,
+            this.antennaParams.initialElevationAngle,
+            this.antennaParams.initialAzimuthAngle
+          );
+          this.antennaEntity.orientation = new Cesium.ConstantProperty(antennaOrientation);
+        }
       }
 
-      // 안테나 위치 재계산
-      if (this.antennaEntity && this.antennaParams) {
-        const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
-          busAxes.yAxis,
-          this.busDimensions.width / 2 + this.antennaParams.depth / 2 + 1,
-          new Cesium.Cartesian3()
-        );
-        const antennaPosition = Cesium.Cartesian3.add(
-          this.currentCartesian,
-          antennaOffset,
-          new Cesium.Cartesian3()
-        );
-        const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
-        this.antennaEntity.position = antennaPositionProperty;
+      console.log('[SatelliteBusPayloadManager] 위치 업데이트 완료:', position);
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] 위치 업데이트 오류:', error);
+    }
+  }
 
-        // 안테나 방향도 재계산
-        const antennaOrientation = this.calculateAntennaOrientation(
+  /**
+   * BUS 크기 업데이트
+   */
+  updateBusDimensions(dimensions: { length: number; width: number; height: number }): void {
+    if (!this.busEntity) {
+      return;
+    }
+
+    try {
+      this.busDimensions = dimensions;
+
+      if (this.busEntity.box) {
+        this.busEntity.box.dimensions = new Cesium.Cartesian3(
+          dimensions.length,
+          dimensions.width,
+          dimensions.height
+        );
+      }
+
+      // 안테나 위치도 재계산 (BUS 크기가 변경되면 안테나 위치도 변경됨)
+      if (this.antennaEntity && this.antennaParams && this.currentCartesian) {
+        const busAxes = calculateBaseAxes(this.currentCartesian);
+        if (busAxes) {
+          const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
+            busAxes.yAxis,
+            dimensions.width / 2 + this.antennaParams.depth / 2 + 1,
+            new Cesium.Cartesian3()
+          );
+          const antennaPosition = Cesium.Cartesian3.add(
+            this.currentCartesian,
+            antennaOffset,
+            new Cesium.Cartesian3()
+          );
+          const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
+          this.antennaEntity.position = antennaPositionProperty;
+        }
+      }
+
+      console.log('[SatelliteBusPayloadManager] BUS 크기 업데이트 완료:', dimensions);
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] BUS 크기 업데이트 오류:', error);
+    }
+  }
+
+  /**
+   * 안테나 크기 업데이트
+   */
+  updateAntennaDimensions(dimensions: { height: number; width: number; depth: number }): void {
+    if (!this.antennaEntity || !this.antennaParams) {
+      return;
+    }
+
+    try {
+      this.antennaParams.height = dimensions.height;
+      this.antennaParams.width = dimensions.width;
+      this.antennaParams.depth = dimensions.depth;
+
+      if (this.antennaEntity.box) {
+        this.antennaEntity.box.dimensions = new Cesium.Cartesian3(
+          dimensions.depth,
+          dimensions.width,
+          dimensions.height
+        );
+      }
+
+      // 안테나 위치도 재계산 (안테나 depth가 변경되면 위치도 변경됨)
+      if (this.busDimensions && this.currentCartesian) {
+        const busAxes = calculateBaseAxes(this.currentCartesian);
+        if (busAxes) {
+          const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
+            busAxes.yAxis,
+            this.busDimensions.width / 2 + dimensions.depth / 2 + 1,
+            new Cesium.Cartesian3()
+          );
+          const antennaPosition = Cesium.Cartesian3.add(
+            this.currentCartesian,
+            antennaOffset,
+            new Cesium.Cartesian3()
+          );
+          const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
+          this.antennaEntity.position = antennaPositionProperty;
+        }
+      }
+
+      console.log('[SatelliteBusPayloadManager] 안테나 크기 업데이트 완료:', dimensions);
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] 안테나 크기 업데이트 오류:', error);
+    }
+  }
+
+  /**
+   * 안테나 방향 업데이트
+   */
+  updateAntennaOrientation(orientation: {
+    rollAngle: number;
+    pitchAngle: number;
+    yawAngle: number;
+    initialElevationAngle: number;
+    initialAzimuthAngle: number;
+  }): void {
+    if (!this.antennaEntity || !this.antennaParams || !this.currentCartesian) {
+      return;
+    }
+
+    try {
+      this.antennaParams.rollAngle = orientation.rollAngle;
+      this.antennaParams.pitchAngle = orientation.pitchAngle;
+      this.antennaParams.yawAngle = orientation.yawAngle;
+      this.antennaParams.initialElevationAngle = orientation.initialElevationAngle;
+      this.antennaParams.initialAzimuthAngle = orientation.initialAzimuthAngle;
+
+      const busAxes = calculateBaseAxes(this.currentCartesian);
+      if (busAxes) {
+        const antennaOrientation = calculateAntennaOrientation(
           busAxes,
-          this.antennaParams.rollAngle,
-          this.antennaParams.pitchAngle,
-          this.antennaParams.yawAngle,
-          this.antennaParams.initialElevationAngle,
-          this.antennaParams.initialAzimuthAngle
+          orientation.rollAngle,
+          orientation.pitchAngle,
+          orientation.yawAngle,
+          orientation.initialElevationAngle,
+          orientation.initialAzimuthAngle
         );
         this.antennaEntity.orientation = new Cesium.ConstantProperty(antennaOrientation);
       }
-    }
 
-    console.log('[SatelliteBusPayloadManager] 위치 업데이트 완료:', position);
+      console.log('[SatelliteBusPayloadManager] 안테나 방향 업데이트 완료:', orientation);
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] 안테나 방향 업데이트 오류:', error);
+    }
+  }
+
+  /**
+   * 모든 파라미터 업데이트 (편의 메서드)
+   */
+  updateAll(params: {
+    position?: { longitude: number; latitude: number; altitude: number };
+    busDimensions?: { length: number; width: number; height: number };
+    antennaDimensions?: { height: number; width: number; depth: number };
+    antennaOrientation?: {
+      rollAngle: number;
+      pitchAngle: number;
+      yawAngle: number;
+      initialElevationAngle: number;
+      initialAzimuthAngle: number;
+    };
+  }): void {
+    if (params.position) {
+      this.updatePosition(params.position);
+    }
+    if (params.busDimensions) {
+      this.updateBusDimensions(params.busDimensions);
+    }
+    if (params.antennaDimensions) {
+      this.updateAntennaDimensions(params.antennaDimensions);
+    }
+    if (params.antennaOrientation) {
+      this.updateAntennaOrientation(params.antennaOrientation);
+    }
   }
 
   /**

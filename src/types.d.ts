@@ -59,6 +59,7 @@ declare namespace Cesium {
   namespace Quaternion {
     function fromAxisAngle(axis: Cartesian3, angle: number, result?: Quaternion): Quaternion;
     function multiply(left: Quaternion, right: Quaternion, result?: Quaternion): Quaternion;
+    function fromRotationMatrix(matrix: Matrix3, result?: Quaternion): Quaternion;
     const IDENTITY: Quaternion;
   }
   class Quaternion {
@@ -71,9 +72,14 @@ declare namespace Cesium {
   namespace Matrix3 {
     function fromQuaternion(quaternion: Quaternion, result?: Matrix3): Matrix3;
     function multiplyByVector(matrix: Matrix3, cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
+    function fromColumnMajorArray(values: number[], result?: Matrix3): Matrix3;
   }
   class Matrix3 {
-    // Matrix3 타입 정의
+    constructor(
+      column0Row0?: number, column1Row0?: number, column2Row0?: number,
+      column0Row1?: number, column1Row1?: number, column2Row1?: number,
+      column0Row2?: number, column1Row2?: number, column2Row2?: number
+    );
   }
   
   // Viewer 및 기타 클래스들
@@ -120,6 +126,10 @@ declare namespace Cesium {
   // Property 관련
   class CallbackProperty {
     constructor(callback: () => any, isConstant?: boolean);
+  }
+  
+  class ConstantProperty {
+    constructor(value: any);
   }
   
   class ConstantPositionProperty {
