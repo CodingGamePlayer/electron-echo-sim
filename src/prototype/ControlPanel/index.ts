@@ -85,6 +85,7 @@ export class ControlPanelManager {
     const satelliteTabContent = document.createElement('div');
     satelliteTabContent.id = 'satelliteTab';
     satelliteTabContent.className = 'tab-content active';
+    satelliteTabContent.style.paddingTop = '0';
     tabContainer.appendChild(satelliteTabContent);
 
     // 궤도 설정 탭 콘텐츠

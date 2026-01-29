@@ -24,7 +24,6 @@ export function renderSatelliteSettingsForm(
 
   // Satellite settings form
   const form = document.createElement('div');
-  form.style.marginTop = '15px';
 
   // 위치 입력 필드 (숨겨진 상태로 생성하여 기본값 사용)
   const lonInput = createInputField(
