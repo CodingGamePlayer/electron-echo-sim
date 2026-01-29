@@ -26,10 +26,10 @@ export function calculateAntennaOrientation(
   azimuthAngle: number
 ): any {
   // 각도를 라디안으로 변환
-  // yaw 90도가 0도가 되도록 하기 위해 yaw에 90도를 더함
+  // BUS의 ECEF 기준 축을 기준으로 회전하므로 추가 오프셋 없음
   const rollRad = Cesium.Math.toRadians(rollAngle);
   const pitchRad = Cesium.Math.toRadians(pitchAngle + 90);
-  const yawRad = Cesium.Math.toRadians(yawAngle + 90); // yaw 90도가 0도가 되도록
+  const yawRad = Cesium.Math.toRadians(yawAngle + 90);
   const elevationRad = Cesium.Math.toRadians(elevationAngle);
   const azimuthRad = Cesium.Math.toRadians(azimuthAngle);
 
@@ -78,45 +78,37 @@ export function calculateAntennaOrientation(
   const baseOrientation = Cesium.Quaternion.fromRotationMatrix(baseRotationMatrix, new Cesium.Quaternion());
 
   // 2. 안테나의 roll/pitch/yaw 회전 적용
-  // 안테나 로컬 좌표계 기준 회전
-  const yawQuaternion = Cesium.Quaternion.fromAxisAngle(antennaBaseZAxisNormalized, yawRad, new Cesium.Quaternion());
-  const yawMatrix = Cesium.Matrix3.fromQuaternion(yawQuaternion, new Cesium.Matrix3());
-  const yAxisAfterYaw = Cesium.Matrix3.multiplyByVector(
-    yawMatrix,
-    antennaBaseYAxisNormalized,
-    new Cesium.Cartesian3()
-  );
-
-  const pitchQuaternion = Cesium.Quaternion.fromAxisAngle(yAxisAfterYaw, pitchRad, new Cesium.Quaternion());
-  const yawPitchQuaternion = Cesium.Quaternion.multiply(
+  // BUS의 ECEF 기준 축을 기준으로 회전 (안테나 축과 동일한 기준)
+  // Roll: BUS의 X축 기준 (동쪽 방향)
+  // Pitch: BUS의 Y축 기준 (남쪽 방향)
+  // Yaw: BUS의 Z축 기준 (지구 중심 반대 방향)
+  const rollQuaternion = Cesium.Quaternion.fromAxisAngle(busAxes.xAxis, rollRad, new Cesium.Quaternion());
+  const pitchQuaternion = Cesium.Quaternion.fromAxisAngle(busAxes.yAxis, pitchRad, new Cesium.Quaternion());
+  const yawQuaternion = Cesium.Quaternion.fromAxisAngle(busAxes.zAxis, yawRad, new Cesium.Quaternion());
+  
+  // 회전 순서: Roll * Pitch * Yaw
+  const pitchYawQuaternion = Cesium.Quaternion.multiply(
     pitchQuaternion,
     yawQuaternion,
     new Cesium.Quaternion()
   );
-  const yawPitchMatrix = Cesium.Matrix3.fromQuaternion(yawPitchQuaternion, new Cesium.Matrix3());
-  const xAxisAfterYawPitch = Cesium.Matrix3.multiplyByVector(
-    yawPitchMatrix,
-    antennaBaseXAxisNormalized,
-    new Cesium.Cartesian3()
-  );
-
-  const rollQuaternion = Cesium.Quaternion.fromAxisAngle(xAxisAfterYawPitch, rollRad, new Cesium.Quaternion());
   const rollPitchYawQuaternion = Cesium.Quaternion.multiply(
     rollQuaternion,
-    yawPitchQuaternion,
+    pitchYawQuaternion,
     new Cesium.Quaternion()
   );
 
   // 3. 초기 elevation/azimuth 각도 적용
-  // Elevation: Y축 기준 회전 (yaw 적용 후 Y축)
-  // Azimuth: Z축 기준 회전 (기본 Z축)
+  // BUS의 ECEF 기준 축을 기준으로 회전
+  // Elevation: BUS의 Y축 기준 (남쪽 방향)
+  // Azimuth: BUS의 Z축 기준 (지구 중심 반대 방향)
   const elevationQuaternion = Cesium.Quaternion.fromAxisAngle(
-    yAxisAfterYaw,
+    busAxes.yAxis,
     elevationRad,
     new Cesium.Quaternion()
   );
   const azimuthQuaternion = Cesium.Quaternion.fromAxisAngle(
-    antennaBaseZAxisNormalized,
+    busAxes.zAxis,
     azimuthRad,
     new Cesium.Quaternion()
   );

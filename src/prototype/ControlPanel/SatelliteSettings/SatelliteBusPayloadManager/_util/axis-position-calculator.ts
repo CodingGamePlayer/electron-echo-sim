@@ -105,3 +105,73 @@ export function getAxisEndPosition(
   // 끝점 계산
   return Cesium.Cartesian3.add(start, scaled, new Cesium.Cartesian3());
 }
+
+/** 축 타입 (임의 축 객체용) */
+export interface AxesLike {
+  xAxis: any;
+  yAxis: any;
+  zAxis: any;
+}
+
+/**
+ * 주어진 중심과 축 벡터로 축 방향선 위치 계산 (안테나 등 임의 방향용)
+ */
+export function getAxisLinePositionsWithAxes(
+  center: any,
+  axes: AxesLike,
+  axis: 'x' | 'y' | 'z',
+  axisLength: number
+): any[] {
+  if (!center || !axes) {
+    return [];
+  }
+  let direction: any;
+  switch (axis) {
+    case 'x':
+      direction = axes.xAxis;
+      break;
+    case 'y':
+      direction = axes.yAxis;
+      break;
+    case 'z':
+      direction = axes.zAxis;
+      break;
+    default:
+      return [];
+  }
+  const normalized = Cesium.Cartesian3.normalize(direction, new Cesium.Cartesian3());
+  const scaled = Cesium.Cartesian3.multiplyByScalar(normalized, axisLength, new Cesium.Cartesian3());
+  const end = Cesium.Cartesian3.add(center, scaled, new Cesium.Cartesian3());
+  return [center, end];
+}
+
+/**
+ * 주어진 중심과 축 벡터로 축 끝점 위치 계산 (레이블용)
+ */
+export function getAxisEndPositionWithAxes(
+  center: any,
+  axes: AxesLike,
+  axis: 'x' | 'y' | 'z',
+  axisLength: number
+): any {
+  if (!center || !axes) {
+    return undefined;
+  }
+  let direction: any;
+  switch (axis) {
+    case 'x':
+      direction = axes.xAxis;
+      break;
+    case 'y':
+      direction = axes.yAxis;
+      break;
+    case 'z':
+      direction = axes.zAxis;
+      break;
+    default:
+      return undefined;
+  }
+  const normalized = Cesium.Cartesian3.normalize(direction, new Cesium.Cartesian3());
+  const scaled = Cesium.Cartesian3.multiplyByScalar(normalized, axisLength, new Cesium.Cartesian3());
+  return Cesium.Cartesian3.add(center, scaled, new Cesium.Cartesian3());
+}

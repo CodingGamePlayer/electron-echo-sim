@@ -1,7 +1,7 @@
 import { calculateBaseAxes } from './_util/base-axes-calculator.js';
 import { calculateAntennaOrientation } from './_util/antenna-orientation-calculator.js';
 import { createBusEntity, createAntennaEntity, calculateBusOrientation, calculateAntennaOrientationForUI } from './_ui/entity-creator.js';
-import { createAxisEntities } from './_ui/axis-creator.js';
+import { createAxisEntities, createAntennaAxisEntities } from './_ui/axis-creator.js';
 import { createDirectionArrows } from './_ui/direction-arrows-creator.js';
 
 /**
@@ -14,6 +14,14 @@ export class SatelliteBusPayloadManager {
   private position: any;
   private currentCartesian: any;
   private axisEntities: {
+    xAxis: any;
+    yAxis: any;
+    zAxis: any;
+    xLabel: any;
+    yLabel: any;
+    zLabel: any;
+  } | null;
+  private antennaAxisEntities: {
     xAxis: any;
     yAxis: any;
     zAxis: any;
@@ -49,6 +57,7 @@ export class SatelliteBusPayloadManager {
     this.position = null;
     this.currentCartesian = null;
     this.axisEntities = null;
+    this.antennaAxisEntities = null;
     this.axisLength = 5; // 기본값: 1km
     this.axisVisible = true;
     this.busDimensions = null;
@@ -168,17 +177,23 @@ export class SatelliteBusPayloadManager {
       console.error('[SatelliteBusPayloadManager] 안테나 엔티티 생성 오류:', error);
     }
 
-    // XYZ 축 생성
+    // XYZ 축 생성 (BUS)
     try {
       this.createAxisLines();
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] XYZ 축 생성 오류:', error);
     }
+
+    // 안테나 XYZ 축 생성
+    try {
+      this.createAntennaAxisLines();
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] 안테나 XYZ 축 생성 오류:', error);
+    }
   }
 
-
   /**
-   * XYZ 축 방향선 생성
+   * XYZ 축 방향선 생성 (BUS)
    */
   private createAxisLines(): void {
     if (!this.viewer || !this.position || !this.currentCartesian) return;
@@ -186,6 +201,20 @@ export class SatelliteBusPayloadManager {
     this.axisEntities = createAxisEntities(
       this.viewer,
       this.currentCartesian,
+      this.axisLength,
+      this.axisVisible
+    );
+  }
+
+  /**
+   * 안테나 XYZ 축 방향선 생성
+   */
+  private createAntennaAxisLines(): void {
+    if (!this.viewer || !this.antennaEntity) return;
+
+    this.antennaAxisEntities = createAntennaAxisEntities(
+      this.viewer,
+      this.antennaEntity,
       this.axisLength,
       this.axisVisible
     );
@@ -494,6 +523,15 @@ export class SatelliteBusPayloadManager {
       if (this.axisEntities.zLabel) this.viewer.entities.remove(this.axisEntities.zLabel);
       this.axisEntities = null;
     }
+    if (this.antennaAxisEntities) {
+      if (this.antennaAxisEntities.xAxis) this.viewer.entities.remove(this.antennaAxisEntities.xAxis);
+      if (this.antennaAxisEntities.yAxis) this.viewer.entities.remove(this.antennaAxisEntities.yAxis);
+      if (this.antennaAxisEntities.zAxis) this.viewer.entities.remove(this.antennaAxisEntities.zAxis);
+      if (this.antennaAxisEntities.xLabel) this.viewer.entities.remove(this.antennaAxisEntities.xLabel);
+      if (this.antennaAxisEntities.yLabel) this.viewer.entities.remove(this.antennaAxisEntities.yLabel);
+      if (this.antennaAxisEntities.zLabel) this.viewer.entities.remove(this.antennaAxisEntities.zLabel);
+      this.antennaAxisEntities = null;
+    }
     this.position = null;
     this.currentCartesian = null;
     this.busDimensions = null;
@@ -515,6 +553,14 @@ export class SatelliteBusPayloadManager {
       this.axisEntities.xLabel.label.show = visible;
       this.axisEntities.yLabel.label.show = visible;
       this.axisEntities.zLabel.label.show = visible;
+    }
+    if (this.antennaAxisEntities) {
+      this.antennaAxisEntities.xAxis.polyline.show = visible;
+      this.antennaAxisEntities.yAxis.polyline.show = visible;
+      this.antennaAxisEntities.zAxis.polyline.show = visible;
+      this.antennaAxisEntities.xLabel.label.show = visible;
+      this.antennaAxisEntities.yLabel.label.show = visible;
+      this.antennaAxisEntities.zLabel.label.show = visible;
     }
   }
 
@@ -551,10 +597,20 @@ export class SatelliteBusPayloadManager {
       return;
     }
 
+    // 안테나 관련 방향인 경우 안테나 위치 Property 전달 (동적 업데이트를 위해)
+    const isAntennaDirection = direction.startsWith('antenna_');
+    let antennaPosition: any = undefined;
+    
+    if (isAntennaDirection && this.antennaEntity) {
+      // 안테나 위치 Property를 직접 전달하여 CallbackProperty에서 사용할 수 있도록 함
+      antennaPosition = this.antennaEntity.position;
+    }
+
     const arrows = createDirectionArrows(
       this.viewer,
       this.currentCartesian,
-      direction
+      direction,
+      antennaPosition
     );
 
     if (arrows) {
