@@ -32,6 +32,121 @@ export class SatelliteSettings {
       this.busPayloadManager = new SatelliteBusPayloadManager(this.viewer);
     }
     this.render();
+    
+    // 폼 렌더링 후 기본값으로 엔티티 자동 생성 및 카메라 이동
+    if (this.viewer && this.busPayloadManager) {
+      // Cesium 초기 카메라 애니메이션이 완료될 때까지 기다린 후 엔티티 생성
+      this.waitForCameraReady(() => {
+        this.createInitialEntity();
+      });
+    }
+  }
+
+  /**
+   * 카메라가 준비될 때까지 대기 (초기 애니메이션 완료 대기)
+   */
+  private waitForCameraReady(callback: () => void): void {
+    if (!this.viewer) {
+      callback();
+      return;
+    }
+
+    // 카메라 이동이 완료되었는지 확인하는 함수
+    const checkCameraReady = () => {
+      // 카메라가 이동 중인지 확인
+      const isMoving = this.viewer.camera._flight && this.viewer.camera._flight.isActive();
+      
+      if (!isMoving) {
+        // 카메라 이동이 완료되었거나 이동 중이 아니면
+        // 추가로 씬 렌더링이 완료될 때까지 약간 대기
+        setTimeout(() => {
+          console.log('[SatelliteSettings] 카메라 준비 완료, 엔티티 생성 시작');
+          callback();
+        }, 500);
+      } else {
+        // 아직 이동 중이면 다시 확인
+        console.log('[SatelliteSettings] 카메라 이동 대기 중...');
+        setTimeout(checkCameraReady, 200);
+      }
+    };
+
+    // 초기 지연 후 확인 시작 (Cesium 초기화 시간 고려)
+    setTimeout(() => {
+      checkCameraReady();
+    }, 1000);
+  }
+
+  /**
+   * 초기 엔티티 생성 (탭 접근 시 자동 생성)
+   */
+  private createInitialEntity(): void {
+    if (!this.busPayloadManager || !this.viewer) {
+      console.error('[SatelliteSettings] 초기 엔티티 생성 실패: busPayloadManager 또는 viewer가 없습니다.');
+      return;
+    }
+
+    console.log('[SatelliteSettings] 초기 엔티티 생성 시작');
+
+    // 기본값으로 엔티티 직접 생성
+    try {
+      const spaceAltitude = 50000000; // 50,000km (지구 반지름의 약 8배)
+      
+      this.busPayloadManager.createSatellite(
+        'Satellite-1',
+        { longitude: 0, latitude: 0, altitude: spaceAltitude },
+        { length: 0.8, width: 0.7, height: 0.84 }, // mm를 미터로 변환: 800mm, 700mm, 840mm
+        {
+          height: 0.8,    // 800mm
+          width: 2.41,   // 2410mm
+          depth: 0.1,    // 100mm
+          rollAngle: 0,
+          pitchAngle: 0,
+          yawAngle: 0,
+          initialElevationAngle: 0,
+          initialAzimuthAngle: 0,
+        },
+        0.001 // 1mm
+      );
+
+      console.log('[SatelliteSettings] 초기 엔티티 생성 완료');
+
+      // 엔티티 생성 후 약간의 지연을 두고 카메라를 BUS에 고정
+      setTimeout(() => {
+        const busEntity = this.busPayloadManager?.getBusEntity();
+        
+        if (busEntity) {
+          console.log('[SatelliteSettings] BUS 엔티티 확인됨, 카메라 위치 설정 시작');
+          
+          const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
+          if (busPosition) {
+            console.log('[SatelliteSettings] BUS 위치:', busPosition);
+            
+            // trackedEntity 해제 (카메라 이동 방해 방지)
+            if (this.viewer.trackedEntity) {
+              console.log('[SatelliteSettings] 기존 trackedEntity 해제');
+              this.viewer.trackedEntity = undefined;
+            }
+            
+            // 카메라 각도 설정
+            setupCameraAngle(this.viewer, busEntity);
+            
+            // Cesium 캔버스가 포커스를 가져가지 않도록 설정
+            const cesiumCanvas = this.viewer?.canvas;
+            if (cesiumCanvas) {
+              cesiumCanvas.setAttribute('tabindex', '-1');
+              cesiumCanvas.style.outline = 'none';
+            }
+            console.log('[SatelliteSettings] 카메라 위치 설정 완료');
+          } else {
+            console.error('[SatelliteSettings] BUS 위치를 가져올 수 없습니다.');
+          }
+        } else {
+          console.error('[SatelliteSettings] BUS 엔티티를 찾을 수 없습니다.');
+        }
+      }, 500); // 엔티티 생성 완료 대기 시간
+    } catch (error) {
+      console.error('[SatelliteSettings] 초기 엔티티 생성 오류:', error);
+    }
   }
 
   /**
@@ -128,7 +243,7 @@ export class SatelliteSettings {
       });
     }
 
-    createSatelliteEntity(this.busPayloadManager, this.viewer);
+    createSatelliteEntity(this.busPayloadManager, this.viewer, true);
 
     // 엔티티 생성 후 약간의 지연을 두고 카메라를 BUS에 고정
     setTimeout(() => {
