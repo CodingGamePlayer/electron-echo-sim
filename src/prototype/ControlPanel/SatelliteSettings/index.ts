@@ -1,4 +1,4 @@
-import { SatelliteBusPayloadManager } from './SatelliteBusPayloadManager.js';
+import { SatelliteBusPayloadManager } from './SatelliteBusPayloadManager/index.js';
 
 /**
  * SatelliteSettings - Satellite settings tab management class
@@ -8,12 +8,14 @@ export class SatelliteSettings {
   private viewer: any;
   private busPayloadManager: SatelliteBusPayloadManager | null;
   private updateDebounceTimer: number | null;
+  private currentDirectionInputId: string | null;
 
   constructor() {
     this.container = null;
     this.viewer = null;
     this.busPayloadManager = null;
     this.updateDebounceTimer = null;
+    this.currentDirectionInputId = null;
   }
 
   /**
@@ -295,13 +297,35 @@ export class SatelliteSettings {
       input.type = 'text';
       input.inputMode = 'decimal'; // 모바일에서 숫자 키패드 표시
       
-      // 포커스 이벤트 로깅
+      // 포커스 이벤트 로깅 및 방향 화살표 표시
       input.addEventListener('focus', () => {
         logInputState('FOCUS');
+        this.showDirectionForInput(id);
       });
       
       input.addEventListener('blur', () => {
         logInputState('BLUR', { valueBefore: input.value });
+        // 다른 입력 필드로 포커스 이동 시에도 화살표가 유지되도록 함
+        // focusin 이벤트가 먼저 발생하므로 지연을 두어 확인
+        setTimeout(() => {
+          const activeElement = document.activeElement as HTMLElement;
+          // 활성 요소가 다른 입력 필드가 아니고, 현재 방향 입력 필드도 아니면 화살표 제거
+          if (activeElement && activeElement.tagName !== 'INPUT' && activeElement.id !== this.currentDirectionInputId) {
+            this.hideDirectionArrows();
+          }
+        }, 200);
+      });
+      
+      // 다른 입력 필드로 포커스 이동 시에도 화살표 유지
+      input.addEventListener('focusin', (e) => {
+        logInputState('FOCUSIN', {
+          relatedTarget: e.relatedTarget,
+          target: e.target === input
+        });
+        // 다른 입력 필드로 포커스 이동 시에도 화살표 표시
+        if (e.target === input) {
+          this.showDirectionForInput(id);
+        }
       });
       
       // 마우스 이벤트 로깅
@@ -330,14 +354,7 @@ export class SatelliteSettings {
         }
       });
       
-      // 포커스 가능 여부 확인
-      input.addEventListener('focusin', (e) => {
-        logInputState('FOCUSIN', {
-          relatedTarget: e.relatedTarget,
-          target: e.target === input
-        });
-      });
-      
+      // focusout 이벤트는 이미 blur에서 처리하므로 여기서는 로깅만
       input.addEventListener('focusout', (e) => {
         logInputState('FOCUSOUT', {
           relatedTarget: e.relatedTarget,
@@ -793,6 +810,20 @@ export class SatelliteSettings {
       if (previousTrackedEntity) {
         this.viewer.trackedEntity = previousTrackedEntity;
       }
+      
+      // 엔티티 업데이트 후에도 현재 포커스된 입력 필드가 있으면 화살표 다시 표시
+      if (this.currentDirectionInputId) {
+        const activeElement = document.activeElement as HTMLInputElement;
+        if (activeElement && activeElement.id === this.currentDirectionInputId) {
+          // 약간의 지연을 두어 엔티티 업데이트가 완료된 후 화살표 표시
+          setTimeout(() => {
+            // 엔티티가 여전히 존재하는지 확인
+            if (this.busPayloadManager && this.busPayloadManager.getBusEntity()) {
+              this.showDirectionForInput(this.currentDirectionInputId!);
+            }
+          }, 100);
+        }
+      }
     }
   }
 
@@ -1093,6 +1124,68 @@ export class SatelliteSettings {
     console.log(`[SatelliteSettings] XYZ 축 표시: ${visible ? 'ON' : 'OFF'}`);
   }
 
+  /**
+   * 입력 필드에 해당하는 방향 화살표 표시
+   */
+  private showDirectionForInput(inputId: string): void {
+    if (!this.busPayloadManager) {
+      return;
+    }
+
+    // 엔티티가 생성되어 있는지 확인
+    const busEntity = this.busPayloadManager.getBusEntity();
+    if (!busEntity) {
+      // 엔티티가 없으면 나중에 다시 시도할 수 있도록 ID만 저장
+      this.currentDirectionInputId = inputId;
+      return;
+    }
+
+    this.currentDirectionInputId = inputId;
+
+    // 입력 필드 ID에 따라 방향 결정
+    let direction: string | null = null;
+    
+    if (inputId === 'prototypeBusLength') {
+      direction = 'bus_length';
+    } else if (inputId === 'prototypeBusWidth') {
+      direction = 'bus_width';
+    } else if (inputId === 'prototypeBusHeight') {
+      direction = 'bus_height';
+    } else if (inputId === 'prototypeAntennaHeight') {
+      direction = 'antenna_height';
+    } else if (inputId === 'prototypeAntennaWidth') {
+      direction = 'antenna_width';
+    } else if (inputId === 'prototypeAntennaDepth') {
+      direction = 'antenna_depth';
+    } else if (inputId === 'prototypeAntennaGap') {
+      direction = 'antenna_gap';
+    } else if (inputId === 'prototypeAntennaRoll') {
+      direction = 'antenna_roll';
+    } else if (inputId === 'prototypeAntennaPitch') {
+      direction = 'antenna_pitch';
+    } else if (inputId === 'prototypeAntennaYaw') {
+      direction = 'antenna_yaw';
+    } else if (inputId === 'prototypeAntennaElevation') {
+      direction = 'antenna_elevation';
+    } else if (inputId === 'prototypeAntennaAzimuth') {
+      direction = 'antenna_azimuth';
+    }
+
+    if (direction) {
+      this.busPayloadManager.showDirectionArrows(direction);
+    }
+  }
+
+  /**
+   * 방향 화살표 숨김
+   */
+  private hideDirectionArrows(): void {
+    if (this.busPayloadManager) {
+      this.busPayloadManager.removeDirectionArrows();
+      this.currentDirectionInputId = null;
+    }
+  }
+
 
   /**
    * Cleanup satellite settings
@@ -1109,6 +1202,9 @@ export class SatelliteSettings {
       this.viewer.trackedEntity = undefined;
     }
 
+    // 방향 화살표 제거
+    this.hideDirectionArrows();
+
     if (this.busPayloadManager) {
       this.busPayloadManager.removeSatellite();
       this.busPayloadManager = null;
@@ -1118,5 +1214,6 @@ export class SatelliteSettings {
     }
     this.container = null;
     this.viewer = null;
+    this.currentDirectionInputId = null;
   }
 }

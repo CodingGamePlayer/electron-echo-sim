@@ -1,6 +1,8 @@
 import { calculateBaseAxes } from './_util/base-axes-calculator.js';
 import { calculateAntennaOrientation } from './_util/antenna-orientation-calculator.js';
-import { getAxisLinePositions, getAxisEndPosition } from './_util/axis-position-calculator.js';
+import { createBusEntity, createAntennaEntity, calculateBusOrientation, calculateAntennaOrientationForUI } from './_ui/entity-creator.js';
+import { createAxisEntities } from './_ui/axis-creator.js';
+import { createDirectionArrows } from './_ui/direction-arrows-creator.js';
 
 /**
  * SatelliteBusPayloadManager - BUS와 Payload(안테나) 엔티티 관리 클래스
@@ -33,6 +35,12 @@ export class SatelliteBusPayloadManager {
     initialAzimuthAngle: number;
   } | null;
   private antennaGap: number; // 버스와 안테나 사이 간격 (미터)
+  private directionArrows: {
+    positive: any;
+    negative: any;
+    positiveLabel: any;
+    negativeLabel: any;
+  } | null;
 
   constructor(viewer: any) {
     this.viewer = viewer;
@@ -46,6 +54,7 @@ export class SatelliteBusPayloadManager {
     this.busDimensions = null;
     this.antennaParams = null;
     this.antennaGap = 0.001; // 기본값: 1mm (미터 단위)
+    this.directionArrows = null;
   }
 
   /**
@@ -97,30 +106,17 @@ export class SatelliteBusPayloadManager {
     }
 
     // BUS 방향 쿼터니언 계산 (기본 방향 - 동쪽을 향하도록)
-    const busOrientation = Cesium.Transforms.headingPitchRollQuaternion(
-      initialCartesian,
-      new Cesium.HeadingPitchRoll(0, 0, 0)
-    );
+    const busOrientation = calculateBusOrientation(initialCartesian);
 
     // BUS 엔티티 생성
     try {
-      this.busEntity = this.viewer.entities.add({
-        name: `${name} - BUS`,
-        position: this.position,
-        orientation: new Cesium.ConstantProperty(busOrientation),
-        box: {
-          dimensions: new Cesium.Cartesian3(
-            busDimensions.length,
-            busDimensions.width,
-            busDimensions.height
-          ),
-          material: Cesium.Color.GRAY.withAlpha(0.8),
-          outline: true,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-        },
-        show: true,
-      });
+      this.busEntity = createBusEntity(
+        this.viewer,
+        name,
+        this.position,
+        busOrientation,
+        busDimensions
+      );
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] BUS 엔티티 생성 오류:', error);
       return;
@@ -142,8 +138,8 @@ export class SatelliteBusPayloadManager {
       const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
 
       // 안테나 방향 계산
-      const antennaOrientation = calculateAntennaOrientation(
-        busAxes,
+      const antennaOrientation = calculateAntennaOrientationForUI(
+        this.currentCartesian,
         antennaParams.rollAngle,
         antennaParams.pitchAngle,
         antennaParams.yawAngle,
@@ -151,24 +147,23 @@ export class SatelliteBusPayloadManager {
         antennaParams.initialAzimuthAngle
       );
 
+      if (!antennaOrientation) {
+        console.error('[SatelliteBusPayloadManager] 안테나 방향 계산 실패');
+        return;
+      }
+
       // 안테나 엔티티 생성
-      this.antennaEntity = this.viewer.entities.add({
-        name: `${name} - Antenna`,
-        position: antennaPositionProperty,
-        orientation: new Cesium.ConstantProperty(antennaOrientation),
-        box: {
-          dimensions: new Cesium.Cartesian3(
-            antennaParams.depth,
-            antennaParams.width,
-            antennaParams.height
-          ),
-          material: Cesium.Color.CYAN.withAlpha(0.7),
-          outline: true,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2,
-        },
-        show: true,
-      });
+      this.antennaEntity = createAntennaEntity(
+        this.viewer,
+        name,
+        antennaPositionProperty,
+        antennaOrientation,
+        {
+          depth: antennaParams.depth,
+          width: antennaParams.width,
+          height: antennaParams.height
+        }
+      );
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] 안테나 엔티티 생성 오류:', error);
     }
@@ -186,124 +181,14 @@ export class SatelliteBusPayloadManager {
    * XYZ 축 방향선 생성
    */
   private createAxisLines(): void {
-    if (!this.viewer || !this.position) return;
+    if (!this.viewer || !this.position || !this.currentCartesian) return;
 
-    // X축 (위성 진행 방향) - 빨간색
-    const xAxisEntity = this.viewer.entities.add({
-      name: 'X-Axis (Satellite Velocity)',
-      polyline: {
-        positions: new Cesium.CallbackProperty(() => {
-          return getAxisLinePositions(this.currentCartesian, 'x', this.axisLength);
-        }, false),
-        width: 3,
-        material: Cesium.Color.RED,
-        clampToGround: false,
-        show: this.axisVisible,
-      },
-    });
-
-    // Y축 (SAR 관측 방향) - 초록색
-    const yAxisEntity = this.viewer.entities.add({
-      name: 'Y-Axis (SAR Look Direction)',
-      polyline: {
-        positions: new Cesium.CallbackProperty(() => {
-          return getAxisLinePositions(this.currentCartesian, 'y', this.axisLength);
-        }, false),
-        width: 3,
-        material: Cesium.Color.GREEN,
-        clampToGround: false,
-        show: this.axisVisible,
-      },
-    });
-
-    // Z축 (지구 중심 방향) - 파란색
-    const zAxisEntity = this.viewer.entities.add({
-      name: 'Z-Axis (Earth Center Direction)',
-      polyline: {
-        positions: new Cesium.CallbackProperty(() => {
-          return getAxisLinePositions(this.currentCartesian, 'z', this.axisLength);
-        }, false),
-        width: 3,
-        material: Cesium.Color.BLUE,
-        clampToGround: false,
-        show: this.axisVisible,
-      },
-    });
-
-    // X축 레이블
-    const xLabelEntity = this.viewer.entities.add({
-      name: 'X-Axis Label',
-      position: new Cesium.CallbackProperty(() => {
-        return getAxisEndPosition(this.currentCartesian, 'x', this.axisLength);
-      }, false),
-      label: {
-        text: 'X',
-        font: '20px sans-serif',
-        fillColor: Cesium.Color.RED,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 0.0),
-        translucencyByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 1.0),
-        show: this.axisVisible,
-      },
-    });
-
-    // Y축 레이블
-    const yLabelEntity = this.viewer.entities.add({
-      name: 'Y-Axis Label',
-      position: new Cesium.CallbackProperty(() => {
-        return getAxisEndPosition(this.currentCartesian, 'y', this.axisLength);
-      }, false),
-      label: {
-        text: 'Y',
-        font: '20px sans-serif',
-        fillColor: Cesium.Color.GREEN,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 0.0),
-        translucencyByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 1.0),
-        show: this.axisVisible,
-      },
-    });
-
-    // Z축 레이블
-    const zLabelEntity = this.viewer.entities.add({
-      name: 'Z-Axis Label',
-      position: new Cesium.CallbackProperty(() => {
-        return getAxisEndPosition(this.currentCartesian, 'z', this.axisLength);
-      }, false),
-      label: {
-        text: 'Z',
-        font: '20px sans-serif',
-        fillColor: Cesium.Color.BLUE,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: Cesium.VerticalOrigin.CENTER,
-        horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 0.0),
-        translucencyByDistance: new Cesium.NearFarScalar(1.0e6, 1.0, 5.0e6, 1.0),
-        show: this.axisVisible,
-      },
-    });
-
-    this.axisEntities = {
-      xAxis: xAxisEntity,
-      yAxis: yAxisEntity,
-      zAxis: zAxisEntity,
-      xLabel: xLabelEntity,
-      yLabel: yLabelEntity,
-      zLabel: zLabelEntity,
-    };
+    this.axisEntities = createAxisEntities(
+      this.viewer,
+      this.currentCartesian,
+      this.axisLength,
+      this.axisVisible
+    );
   }
 
 
@@ -599,6 +484,9 @@ export class SatelliteBusPayloadManager {
     this.currentCartesian = null;
     this.busDimensions = null;
     this.antennaParams = null;
+    
+    // 방향 화살표 제거
+    this.removeDirectionArrows();
   }
 
   /**
@@ -635,5 +523,41 @@ export class SatelliteBusPayloadManager {
    */
   getAntennaEntity(): any {
     return this.antennaEntity;
+  }
+
+  /**
+   * 방향 화살표 표시
+   * @param direction 방향 ('bus_length' | 'bus_width' | 'bus_height' | 'antenna_height' | 'antenna_width' | 'antenna_depth' | 'antenna_gap' | 'antenna_roll' | 'antenna_pitch' | 'antenna_yaw' | 'antenna_elevation' | 'antenna_azimuth')
+   */
+  showDirectionArrows(direction: string): void {
+    // 기존 화살표 제거
+    this.removeDirectionArrows();
+
+    if (!this.viewer || !this.currentCartesian || !this.busEntity) {
+      return;
+    }
+
+    const arrows = createDirectionArrows(
+      this.viewer,
+      this.currentCartesian,
+      direction
+    );
+
+    if (arrows) {
+      this.directionArrows = arrows;
+    }
+  }
+
+  /**
+   * 방향 화살표 제거
+   */
+  removeDirectionArrows(): void {
+    if (this.directionArrows) {
+      if (this.directionArrows.positive) this.viewer.entities.remove(this.directionArrows.positive);
+      if (this.directionArrows.negative) this.viewer.entities.remove(this.directionArrows.negative);
+      if (this.directionArrows.positiveLabel) this.viewer.entities.remove(this.directionArrows.positiveLabel);
+      if (this.directionArrows.negativeLabel) this.viewer.entities.remove(this.directionArrows.negativeLabel);
+      this.directionArrows = null;
+    }
   }
 }
