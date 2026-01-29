@@ -161,6 +161,8 @@ export function parseAntennaOrientationInputs(): {
   };
 }
 
+import { DEFAULT_SATELLITE_INFO } from '../constants.js';
+
 /**
  * 위성 기본 정보 파싱
  */
@@ -168,7 +170,8 @@ export function parseSatelliteBasicInfo(): {
   name: string;
   id: string;
 } {
-  const name = (document.getElementById('prototypeSatelliteName') as HTMLInputElement)?.value || 'Satellite';
-  const id = (document.getElementById('prototypeSatelliteId') as HTMLInputElement)?.value || '';
+  // 입력 필드가 없으므로 기본값 사용
+  const name = (document.getElementById('prototypeSatelliteName') as HTMLInputElement)?.value || DEFAULT_SATELLITE_INFO.NAME;
+  const id = (document.getElementById('prototypeSatelliteId') as HTMLInputElement)?.value || DEFAULT_SATELLITE_INFO.ID;
   return { name, id };
 }

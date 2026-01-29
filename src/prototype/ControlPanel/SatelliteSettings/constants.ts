@@ -31,7 +31,7 @@ export const DEFAULT_POSITION = {
   /** 기본 위도 (도) */
   LATITUDE: 37.5,
   /** 기본 고도 (km) */
-  ALTITUDE_KM: 591,
+  ALTITUDE_KM: 500000,
 } as const;
 
 // 기본 BUS 크기 (mm)

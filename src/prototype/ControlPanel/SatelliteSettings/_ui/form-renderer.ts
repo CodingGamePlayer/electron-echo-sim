@@ -37,35 +37,9 @@ export function renderSatelliteSettingsForm(
   const form = document.createElement('div');
   form.style.marginTop = '15px';
 
-  // 위성 기본 정보 섹션
-  const basicInfoSection = createSection('위성 기본 정보');
+  // 위치 설정 섹션
+  const positionSection = createSection('위치 설정');
   
-  // Satellite name input
-  const nameInput = createInputField(
-    '위성 이름:',
-    'prototypeSatelliteName',
-    'text',
-    '위성 이름을 입력하세요',
-    'Satellite-1',
-    callbacks.onInputFocus,
-    callbacks.onInputBlur,
-    callbacks.onInputChange
-  );
-  basicInfoSection.appendChild(nameInput);
-
-  // Satellite ID input
-  const idInput = createInputField(
-    '위성 ID:',
-    'prototypeSatelliteId',
-    'text',
-    '위성 ID를 입력하세요',
-    'SAT-001',
-    callbacks.onInputFocus,
-    callbacks.onInputBlur,
-    callbacks.onInputChange
-  );
-  basicInfoSection.appendChild(idInput);
-
   // 위치 입력 필드
   const lonInput = createInputField(
     '경도 (도):',
@@ -77,7 +51,7 @@ export function renderSatelliteSettingsForm(
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  basicInfoSection.appendChild(lonInput);
+  positionSection.appendChild(lonInput);
 
   const latInput = createInputField(
     '위도 (도):',
@@ -89,21 +63,21 @@ export function renderSatelliteSettingsForm(
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  basicInfoSection.appendChild(latInput);
+  positionSection.appendChild(latInput);
 
   const altInput = createInputField(
     '고도 (km):',
     'prototypeSatelliteAltitude',
     'number',
     '0 이상',
-    '591',
+    '50000',
     callbacks.onInputFocus,
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  basicInfoSection.appendChild(altInput);
+  positionSection.appendChild(altInput);
 
-  form.appendChild(basicInfoSection);
+  form.appendChild(positionSection);
 
   // BUS 설정 섹션
   const busSection = createSection('BUS 설정');
