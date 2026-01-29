@@ -153,6 +153,10 @@ export class ControlPanelManager {
 
         // 궤도 설정 탭 클릭 시 지구로 카메라 이동
         if (targetTab === 'orbit' && this.viewer) {
+          // 위성 엔티티로 이동하는 애니메이션 취소
+          if (this.satelliteSettings) {
+            this.satelliteSettings.cancelCameraAnimation();
+          }
           this.flyToEarth();
         }
       });

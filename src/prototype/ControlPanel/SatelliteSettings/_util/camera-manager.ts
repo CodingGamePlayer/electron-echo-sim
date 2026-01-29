@@ -42,14 +42,15 @@ export function waitForCameraReady(
 
 /**
  * 카메라 각도 설정
+ * @returns setTimeout 타이머 ID (취소 가능하도록)
  */
 export function setupCameraAngle(
   viewer: any,
   busEntity: any
-): void {
+): number | null {
   if (!viewer || !busEntity) {
     console.error('[setupCameraAngle] viewer 또는 busEntity가 없습니다.');
-    return;
+    return null;
   }
 
   // trackedEntity 해제 (카메라 이동 방해 방지)
@@ -58,7 +59,7 @@ export function setupCameraAngle(
   const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
   if (!busPosition) {
     console.error('[setupCameraAngle] BUS 위치를 가져올 수 없습니다.');
-    return;
+    return null;
   }
 
   // 공통 함수로 카메라 거리 계산
@@ -71,7 +72,7 @@ export function setupCameraAngle(
     }
 
     // 약간의 지연 후 카메라 이동 (기존 애니메이션 완전 종료 대기)
-    setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       // flyTo를 사용하여 부드럽게 이동
       viewer.camera.flyTo({
         destination: busPosition,
@@ -94,6 +95,8 @@ export function setupCameraAngle(
         }
       });
     }, TIMER.CAMERA_ANIMATION_CANCEL_DELAY);
+
+    return timerId;
   } catch (error) {
     console.error('[setupCameraAngle] 카메라 이동 오류:', error);
     // flyTo 실패 시 lookAt으로 폴백
@@ -109,6 +112,7 @@ export function setupCameraAngle(
     } catch (fallbackError) {
       console.error('[setupCameraAngle] lookAt 폴백도 실패:', fallbackError);
     }
+    return null;
   }
 }
 

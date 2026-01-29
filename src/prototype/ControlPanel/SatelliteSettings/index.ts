@@ -26,6 +26,7 @@ export class SatelliteSettings {
   private busPayloadManager: SatelliteBusPayloadManager | null;
   private updateDebounceTimer: number | null;
   private currentDirectionInputId: string | null;
+  private cameraAnimationTimer: number | null;
 
   constructor() {
     this.container = null;
@@ -33,6 +34,7 @@ export class SatelliteSettings {
     this.busPayloadManager = null;
     this.updateDebounceTimer = null;
     this.currentDirectionInputId = null;
+    this.cameraAnimationTimer = null;
   }
 
   /**
@@ -357,9 +359,29 @@ export class SatelliteSettings {
       return;
     }
 
+    // 기존 카메라 애니메이션 타이머 취소
+    this.cancelCameraAnimation();
+
     // 엔티티가 있으면 카메라 이동
-    setupCameraAngle(this.viewer, busEntity);
+    const timerId = setupCameraAngle(this.viewer, busEntity);
+    this.cameraAnimationTimer = timerId;
     setupCanvasFocus(this.viewer);
+  }
+
+  /**
+   * 위성 엔티티로 이동하는 카메라 애니메이션 취소
+   */
+  cancelCameraAnimation(): void {
+    // 타이머 취소
+    if (this.cameraAnimationTimer !== null) {
+      clearTimeout(this.cameraAnimationTimer);
+      this.cameraAnimationTimer = null;
+    }
+
+    // 진행 중인 카메라 애니메이션 취소
+    if (this.viewer && this.viewer.camera._flight && this.viewer.camera._flight.isActive()) {
+      this.viewer.camera.cancelFlight();
+    }
   }
 
   /**
@@ -371,6 +393,9 @@ export class SatelliteSettings {
       clearTimeout(this.updateDebounceTimer);
       this.updateDebounceTimer = null;
     }
+
+    // 카메라 애니메이션 타이머 정리
+    this.cancelCameraAnimation();
     
     // 카메라 고정 해제
     if (this.viewer) {
