@@ -84,13 +84,13 @@ export class SatelliteSettings {
     // BUS 설정 섹션
     const busSection = this.createSection('BUS 설정');
     
-    const busLengthInput = this.createInputField('BUS 길이 (미터):', 'prototypeBusLength', 'number', '예: 5.0', '5.0');
+    const busLengthInput = this.createInputField('BUS 길이 (mm):', 'prototypeBusLength', 'number', '예: 800', '800');
     busSection.appendChild(busLengthInput);
 
-    const busWidthInput = this.createInputField('BUS 너비 (미터):', 'prototypeBusWidth', 'number', '예: 2.0', '2.0');
+    const busWidthInput = this.createInputField('BUS 너비 (mm):', 'prototypeBusWidth', 'number', '예: 700', '700');
     busSection.appendChild(busWidthInput);
 
-    const busHeightInput = this.createInputField('BUS 높이 (미터):', 'prototypeBusHeight', 'number', '예: 2.0', '2.0');
+    const busHeightInput = this.createInputField('BUS 높이 (mm):', 'prototypeBusHeight', 'number', '예: 840', '840');
     busSection.appendChild(busHeightInput);
 
     form.appendChild(busSection);
@@ -98,13 +98,13 @@ export class SatelliteSettings {
     // 안테나 크기 설정 섹션
     const antennaSizeSection = this.createSection('안테나 크기 설정');
     
-    const antennaHeightInput = this.createInputField('안테나 높이 (미터):', 'prototypeAntennaHeight', 'number', '예: 3.0', '3.0');
+    const antennaHeightInput = this.createInputField('안테나 높이 (mm):', 'prototypeAntennaHeight', 'number', '예: 800', '800');
     antennaSizeSection.appendChild(antennaHeightInput);
 
-    const antennaWidthInput = this.createInputField('안테나 너비 (미터):', 'prototypeAntennaWidth', 'number', '예: 5.0', '5.0');
+    const antennaWidthInput = this.createInputField('안테나 너비 (mm):', 'prototypeAntennaWidth', 'number', '예: 2410', '2410');
     antennaSizeSection.appendChild(antennaWidthInput);
 
-    const antennaDepthInput = this.createInputField('안테나 두께 (미터):', 'prototypeAntennaDepth', 'number', '예: 0.1', '0.1');
+    const antennaDepthInput = this.createInputField('안테나 두께 (mm):', 'prototypeAntennaDepth', 'number', '예: 100', '100');
     antennaSizeSection.appendChild(antennaDepthInput);
 
     form.appendChild(antennaSizeSection);
@@ -351,42 +351,44 @@ export class SatelliteSettings {
         }
       }
 
-      // BUS 크기 가져오기 및 검증
+      // BUS 크기 가져오기 및 검증 (mm를 미터로 변환)
       const busLengthInput = (document.getElementById('prototypeBusLength') as HTMLInputElement)?.value;
       const busWidthInput = (document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value;
       const busHeightInput = (document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value;
 
       if (busLengthInput && busWidthInput && busHeightInput) {
-        const busLength = parseFloat(busLengthInput);
-        const busWidth = parseFloat(busWidthInput);
-        const busHeight = parseFloat(busHeightInput);
+        const busLengthMm = parseFloat(busLengthInput);
+        const busWidthMm = parseFloat(busWidthInput);
+        const busHeightMm = parseFloat(busHeightInput);
 
-        if (!isNaN(busLength) && !isNaN(busWidth) && !isNaN(busHeight) &&
-            busLength > 0 && busWidth > 0 && busHeight > 0) {
+        if (!isNaN(busLengthMm) && !isNaN(busWidthMm) && !isNaN(busHeightMm) &&
+            busLengthMm > 0 && busWidthMm > 0 && busHeightMm > 0) {
+          // mm를 미터로 변환 (Cesium은 미터 단위 사용)
           this.busPayloadManager.updateBusDimensions({
-            length: busLength,
-            width: busWidth,
-            height: busHeight
+            length: busLengthMm / 1000,
+            width: busWidthMm / 1000,
+            height: busHeightMm / 1000
           });
         }
       }
 
-      // 안테나 크기 가져오기 및 검증
+      // 안테나 크기 가져오기 및 검증 (mm를 미터로 변환)
       const antennaHeightInput = (document.getElementById('prototypeAntennaHeight') as HTMLInputElement)?.value;
       const antennaWidthInput = (document.getElementById('prototypeAntennaWidth') as HTMLInputElement)?.value;
       const antennaDepthInput = (document.getElementById('prototypeAntennaDepth') as HTMLInputElement)?.value;
 
       if (antennaHeightInput && antennaWidthInput && antennaDepthInput) {
-        const antennaHeight = parseFloat(antennaHeightInput);
-        const antennaWidth = parseFloat(antennaWidthInput);
-        const antennaDepth = parseFloat(antennaDepthInput);
+        const antennaHeightMm = parseFloat(antennaHeightInput);
+        const antennaWidthMm = parseFloat(antennaWidthInput);
+        const antennaDepthMm = parseFloat(antennaDepthInput);
 
-        if (!isNaN(antennaHeight) && !isNaN(antennaWidth) && !isNaN(antennaDepth) &&
-            antennaHeight > 0 && antennaWidth > 0 && antennaDepth > 0) {
+        if (!isNaN(antennaHeightMm) && !isNaN(antennaWidthMm) && !isNaN(antennaDepthMm) &&
+            antennaHeightMm > 0 && antennaWidthMm > 0 && antennaDepthMm > 0) {
+          // mm를 미터로 변환 (Cesium은 미터 단위 사용)
           this.busPayloadManager.updateAntennaDimensions({
-            height: antennaHeight,
-            width: antennaWidth,
-            depth: antennaDepth
+            height: antennaHeightMm / 1000,
+            width: antennaWidthMm / 1000,
+            depth: antennaDepthMm / 1000
           });
         }
       }
@@ -460,13 +462,22 @@ export class SatelliteSettings {
       return;
     }
 
-    const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
-    const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
-    const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
+    const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
+    const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
+    const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
 
-    const antennaHeight = parseFloat((document.getElementById('prototypeAntennaHeight') as HTMLInputElement)?.value || '3');
-    const antennaWidth = parseFloat((document.getElementById('prototypeAntennaWidth') as HTMLInputElement)?.value || '5');
-    const antennaDepth = parseFloat((document.getElementById('prototypeAntennaDepth') as HTMLInputElement)?.value || '0.1');
+    const antennaHeightMm = parseFloat((document.getElementById('prototypeAntennaHeight') as HTMLInputElement)?.value || '800');
+    const antennaWidthMm = parseFloat((document.getElementById('prototypeAntennaWidth') as HTMLInputElement)?.value || '2410');
+    const antennaDepthMm = parseFloat((document.getElementById('prototypeAntennaDepth') as HTMLInputElement)?.value || '100');
+
+    // mm를 미터로 변환 (Cesium은 미터 단위 사용)
+    const busLength = busLengthMm / 1000;
+    const busWidth = busWidthMm / 1000;
+    const busHeight = busHeightMm / 1000;
+
+    const antennaHeight = antennaHeightMm / 1000;
+    const antennaWidth = antennaWidthMm / 1000;
+    const antennaDepth = antennaDepthMm / 1000;
 
     const antennaRoll = parseFloat((document.getElementById('prototypeAntennaRoll') as HTMLInputElement)?.value || '0');
     const antennaPitch = parseFloat((document.getElementById('prototypeAntennaPitch') as HTMLInputElement)?.value || '0');
@@ -534,11 +545,11 @@ export class SatelliteSettings {
         if (busEntity) {
           const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
           if (busPosition) {
-            // BUS 크기 정보로 적절한 거리 계산
-            const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
-            const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
-            const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
-            const maxBusSize = Math.max(busLength, busWidth, busHeight);
+            // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
+            const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
+            const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
+            const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
+            const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
             
             // 대각선에서 바라보는 각도 설정
             const cameraRange = Math.max(maxBusSize * 3, 20);
@@ -683,11 +694,11 @@ export class SatelliteSettings {
 
       const busPosition = busEntity.position?.getValue(Cesium.JulianDate.now());
       if (busPosition) {
-        // BUS 크기 정보로 적절한 거리 계산
-        const busLength = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '5');
-        const busWidth = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '2');
-        const busHeight = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '2');
-        const maxBusSize = Math.max(busLength, busWidth, busHeight);
+        // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
+        const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
+        const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
+        const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
+        const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
         
         // 대각선에서 바라보는 각도 설정
         const cameraRange = Math.max(maxBusSize * 3, 20);
