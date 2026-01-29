@@ -72,6 +72,11 @@ export function renderSatelliteSettingsForm(
 
   // BUS 설정 섹션
   const busSection = createSection('BUS 설정');
+  // 타이틀 제거
+  const busSectionTitle = busSection.querySelector('h4');
+  if (busSectionTitle) {
+    busSection.removeChild(busSectionTitle);
+  }
   // 첫 번째 섹션이므로 구분선 제거, 적절한 상단 간격 유지
   busSection.style.borderTop = 'none';
   busSection.style.paddingTop = '0';
@@ -117,6 +122,11 @@ export function renderSatelliteSettingsForm(
 
   // 안테나 크기 설정 섹션
   const antennaSizeSection = createSection('안테나 크기 설정');
+  // 타이틀 제거
+  const antennaSizeSectionTitle = antennaSizeSection.querySelector('h4');
+  if (antennaSizeSectionTitle) {
+    antennaSizeSection.removeChild(antennaSizeSectionTitle);
+  }
   
   const antennaHeightInput = createInputField(
     '안테나 높이 (mm):',
@@ -158,6 +168,11 @@ export function renderSatelliteSettingsForm(
 
   // 버스-안테나 간격 설정 섹션
   const gapSection = createSection('버스-안테나 간격 설정');
+  // 타이틀 제거
+  const gapSectionTitle = gapSection.querySelector('h4');
+  if (gapSectionTitle) {
+    gapSection.removeChild(gapSectionTitle);
+  }
   
   const antennaGapInput = createInputField(
     '버스-안테나 간격 (mm):',
@@ -175,6 +190,11 @@ export function renderSatelliteSettingsForm(
 
   // 안테나 방향 파라미터 섹션
   const antennaOrientationSection = createSection('안테나 방향 파라미터');
+  // 타이틀 제거
+  const antennaOrientationSectionTitle = antennaOrientationSection.querySelector('h4');
+  if (antennaOrientationSectionTitle) {
+    antennaOrientationSection.removeChild(antennaOrientationSectionTitle);
+  }
   
   const antennaRollInput = createInputField(
     'Antenna Roll Angle (도):',
@@ -240,6 +260,11 @@ export function renderSatelliteSettingsForm(
 
   // 안테나 기타 파라미터 섹션 (데이터 저장용)
   const antennaOtherSection = createSection('안테나 기타 파라미터 (데이터 저장용)');
+  // 타이틀 제거
+  const antennaOtherSectionTitle = antennaOtherSection.querySelector('h4');
+  if (antennaOtherSectionTitle) {
+    antennaOtherSection.removeChild(antennaOtherSectionTitle);
+  }
   
   const beamwidthElevationInput = createInputField(
     'Beamwidth Elevation (도):',

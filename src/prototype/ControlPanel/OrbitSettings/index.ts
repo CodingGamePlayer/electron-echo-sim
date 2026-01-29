@@ -34,10 +34,6 @@ export class OrbitSettings {
     const section = document.createElement('div');
     section.className = 'sidebar-section';
 
-    const title = document.createElement('h3');
-    title.textContent = '궤도 설정';
-    section.appendChild(title);
-
     // Orbit settings form
     const form = document.createElement('div');
     form.style.marginTop = '15px';
