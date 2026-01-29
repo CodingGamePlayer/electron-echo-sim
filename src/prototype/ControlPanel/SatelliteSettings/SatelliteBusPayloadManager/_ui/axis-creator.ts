@@ -5,16 +5,18 @@ import {
   getAxisEndPositionWithAxes,
   type AxesLike,
 } from '../_util/axis-position-calculator.js';
-import { calculateBaseAxes } from '../_util/base-axes-calculator.js';
+import { calculateBaseAxes, type VelocityDirectionOptions } from '../_util/base-axes-calculator.js';
 
 /**
  * XYZ 축 엔티티 생성
+ * @param velocityOptions 속도 방향(방위각/고도각 deg). 없으면 기존 동작
  */
 export function createAxisEntities(
   viewer: any,
   currentCartesian: any,
   axisLength: number,
-  axisVisible: boolean
+  axisVisible: boolean,
+  velocityOptions?: VelocityDirectionOptions
 ): {
   xAxis: any;
   yAxis: any;
@@ -28,7 +30,7 @@ export function createAxisEntities(
     name: 'X-Axis (Satellite Velocity)',
     polyline: {
       positions: new Cesium.CallbackProperty(() => {
-        return getAxisLinePositions(currentCartesian, 'x', axisLength);
+        return getAxisLinePositions(currentCartesian, 'x', axisLength, velocityOptions);
       }, false),
       width: 3,
       material: Cesium.Color.RED,
@@ -42,7 +44,7 @@ export function createAxisEntities(
     name: 'Y-Axis (SAR Look Direction)',
     polyline: {
       positions: new Cesium.CallbackProperty(() => {
-        return getAxisLinePositions(currentCartesian, 'y', axisLength);
+        return getAxisLinePositions(currentCartesian, 'y', axisLength, velocityOptions);
       }, false),
       width: 3,
       material: Cesium.Color.GREEN,
@@ -56,7 +58,7 @@ export function createAxisEntities(
     name: 'Z-Axis (Earth Center Direction)',
     polyline: {
       positions: new Cesium.CallbackProperty(() => {
-        return getAxisLinePositions(currentCartesian, 'z', axisLength);
+        return getAxisLinePositions(currentCartesian, 'z', axisLength, velocityOptions);
       }, false),
       width: 3,
       material: Cesium.Color.BLUE,
@@ -69,7 +71,7 @@ export function createAxisEntities(
   const xLabelEntity = viewer.entities.add({
     name: 'X-Axis Label',
     position: new Cesium.CallbackProperty(() => {
-      return getAxisEndPosition(currentCartesian, 'x', axisLength);
+      return getAxisEndPosition(currentCartesian, 'x', axisLength, velocityOptions);
     }, false),
     label: {
       text: 'X',
@@ -91,7 +93,7 @@ export function createAxisEntities(
   const yLabelEntity = viewer.entities.add({
     name: 'Y-Axis Label',
     position: new Cesium.CallbackProperty(() => {
-      return getAxisEndPosition(currentCartesian, 'y', axisLength);
+      return getAxisEndPosition(currentCartesian, 'y', axisLength, velocityOptions);
     }, false),
     label: {
       text: 'Y',
@@ -113,7 +115,7 @@ export function createAxisEntities(
   const zLabelEntity = viewer.entities.add({
     name: 'Z-Axis Label',
     position: new Cesium.CallbackProperty(() => {
-      return getAxisEndPosition(currentCartesian, 'z', axisLength);
+      return getAxisEndPosition(currentCartesian, 'z', axisLength, velocityOptions);
     }, false),
     label: {
       text: 'Z',
@@ -143,12 +145,14 @@ export function createAxisEntities(
 
 /**
  * 안테나 XYZ 축 엔티티 생성 (BUS와 동일한 방향 사용, 안테나 위치에서 시작)
+ * @param velocityOptions 속도 방향(방위각/고도각 deg). 없으면 기존 동작
  */
 export function createAntennaAxisEntities(
   viewer: any,
   antennaEntity: any,
   axisLength: number,
-  axisVisible: boolean
+  axisVisible: boolean,
+  velocityOptions?: VelocityDirectionOptions
 ): {
   xAxis: any;
   yAxis: any;
@@ -163,7 +167,7 @@ export function createAntennaAxisEntities(
     const center = antennaEntity.position?.getValue(time);
     if (!center) return { center: null, axes: null };
     // BUS와 동일한 방향의 축 계산 (안테나 위치에서)
-    const axes = calculateBaseAxes(center);
+    const axes = calculateBaseAxes(center, velocityOptions);
     return { center, axes };
   };
 

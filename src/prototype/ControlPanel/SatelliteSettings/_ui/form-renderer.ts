@@ -11,6 +11,8 @@ export interface FormRendererCallbacks {
   onCreateButtonClick?: () => void;
   onAxisToggleChange?: (checked: boolean) => void;
   onAxisLengthChange?: (length: number) => void;
+  /** 속도 방위각/고도각 변경 시 (deg) */
+  onVelocityDirectionChange?: (azimuthDeg: number, elevationDeg: number) => void;
 }
 
 /**
@@ -70,6 +72,61 @@ export function renderSatelliteSettingsForm(
   form.appendChild(lonInput);
   form.appendChild(latInput);
   form.appendChild(altInput);
+
+  // 속도 방향 (방위각/고도각) - BUS 설정 위
+  const velocitySection = createSection('속도 방향');
+  const velocitySectionTitle = velocitySection.querySelector('h4');
+  if (velocitySectionTitle) {
+    velocitySection.removeChild(velocitySectionTitle);
+  }
+  velocitySection.style.borderTop = 'none';
+  velocitySection.style.paddingTop = '0';
+  velocitySection.style.marginTop = '15px';
+
+  const notifyVelocityDirection = () => {
+    if (!callbacks.onVelocityDirectionChange) return;
+    const azEl = document.getElementById('prototypeVelocityAzimuth') as HTMLInputElement | null;
+    const elEl = document.getElementById('prototypeVelocityElevation') as HTMLInputElement | null;
+    const az = azEl ? Number(azEl.value) : 0;
+    const el = elEl ? Number(elEl.value) : 0;
+    callbacks.onVelocityDirectionChange(az, el);
+  };
+
+  const velocityAzimuthInput = createInputField(
+    '속도 방위각 (deg):',
+    'prototypeVelocityAzimuth',
+    'number',
+    '0=동쪽, 90=북쪽',
+    '0',
+    callbacks.onInputFocus,
+    callbacks.onInputBlur,
+    () => {
+      if (callbacks.onInputChange) callbacks.onInputChange();
+      notifyVelocityDirection();
+    }
+  );
+  (velocityAzimuthInput.querySelector('input') as HTMLInputElement).style.display = 'none';
+  (velocityAzimuthInput as HTMLElement).style.display = 'none';
+  velocitySection.appendChild(velocityAzimuthInput);
+
+  const velocityElevationInput = createInputField(
+    '속도 고도각 (deg):',
+    'prototypeVelocityElevation',
+    'number',
+    '0=수평',
+    '0',
+    callbacks.onInputFocus,
+    callbacks.onInputBlur,
+    () => {
+      if (callbacks.onInputChange) callbacks.onInputChange();
+      notifyVelocityDirection();
+    }
+  );
+  (velocityElevationInput.querySelector('input') as HTMLInputElement).style.display = 'none';
+  (velocityElevationInput as HTMLElement).style.display = 'none';
+  velocitySection.appendChild(velocityElevationInput);
+  velocitySection.style.display = 'none';
+  form.appendChild(velocitySection);
 
   // BUS 설정 섹션
   const busSection = createSection('BUS 설정');

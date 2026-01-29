@@ -152,7 +152,12 @@ export class SatelliteSettings {
       },
       onAxisLengthChange: (length: number) => {
         this.setAxisLength(length);
-      }
+      },
+      onVelocityDirectionChange: (azimuthDeg: number, elevationDeg: number) => {
+        if (this.busPayloadManager) {
+          this.busPayloadManager.setVelocityDirection(azimuthDeg, elevationDeg);
+        }
+      },
     };
 
     renderSatelliteSettingsForm(this.container, callbacks);

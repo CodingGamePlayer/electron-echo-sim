@@ -1,4 +1,4 @@
-import { calculateBaseAxes } from '../_util/base-axes-calculator.js';
+import { calculateBaseAxes, type VelocityDirectionOptions } from '../_util/base-axes-calculator.js';
 
 /**
  * 방향 화살표 생성
@@ -6,12 +6,14 @@ import { calculateBaseAxes } from '../_util/base-axes-calculator.js';
  * @param currentCartesian 중심 위치 (BUS 또는 안테나)
  * @param direction 방향 문자열
  * @param antennaPosition 선택적: 안테나 위치 (안테나 관련 방향일 때 사용)
+ * @param velocityOptions 속도 방향(방위각/고도각 deg). 없으면 기존 동작
  */
 export function createDirectionArrows(
   viewer: any,
   currentCartesian: any,
   direction: string,
-  antennaPosition?: any
+  antennaPosition?: any,
+  velocityOptions?: VelocityDirectionOptions
 ): {
   positive: any;
   negative: any;
@@ -33,7 +35,7 @@ export function createDirectionArrows(
   };
   const centerPosition = getCenterCartesian();
   
-  const busAxes = calculateBaseAxes(centerPosition);
+  const busAxes = calculateBaseAxes(centerPosition, velocityOptions);
   if (!busAxes) {
     return null;
   }
@@ -111,7 +113,7 @@ export function createDirectionArrows(
       positions: useCallback
         ? new Cesium.CallbackProperty(() => {
             const currentCenter = antennaPosition?.getValue?.(viewer.clock.currentTime) || centerPosition;
-            const currentAxes = calculateBaseAxes(currentCenter);
+            const currentAxes = calculateBaseAxes(currentCenter, velocityOptions);
             if (!currentAxes) return [];
             const currentDirectionVector = getDirectionVector(currentAxes);
             if (!currentDirectionVector) return [];
@@ -135,7 +137,7 @@ export function createDirectionArrows(
       positions: useCallback
         ? new Cesium.CallbackProperty(() => {
             const currentCenter = antennaPosition?.getValue?.(viewer.clock.currentTime) || centerPosition;
-            const currentAxes = calculateBaseAxes(currentCenter);
+            const currentAxes = calculateBaseAxes(currentCenter, velocityOptions);
             if (!currentAxes) return [];
             const currentDirectionVector = getDirectionVector(currentAxes);
             if (!currentDirectionVector) return [];
@@ -158,7 +160,7 @@ export function createDirectionArrows(
     position: useCallback
       ? new Cesium.CallbackProperty(() => {
           const currentCenter = antennaPosition?.getValue?.(viewer.clock.currentTime) || centerPosition;
-          const currentAxes = calculateBaseAxes(currentCenter);
+          const currentAxes = calculateBaseAxes(currentCenter, velocityOptions);
           if (!currentAxes) return undefined;
             const currentDirectionVector = getDirectionVector(currentAxes);
             if (!currentDirectionVector) return undefined;
@@ -187,7 +189,7 @@ export function createDirectionArrows(
     position: useCallback
       ? new Cesium.CallbackProperty(() => {
           const currentCenter = antennaPosition?.getValue?.(viewer.clock.currentTime) || centerPosition;
-          const currentAxes = calculateBaseAxes(currentCenter);
+          const currentAxes = calculateBaseAxes(currentCenter, velocityOptions);
           if (!currentAxes) return undefined;
             const currentDirectionVector = getDirectionVector(currentAxes);
             if (!currentDirectionVector) return undefined;

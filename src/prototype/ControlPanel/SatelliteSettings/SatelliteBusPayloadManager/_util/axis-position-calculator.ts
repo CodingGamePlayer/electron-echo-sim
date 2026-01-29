@@ -1,4 +1,7 @@
-import { calculateBaseAxes } from './base-axes-calculator.js';
+import {
+  calculateBaseAxes,
+  type VelocityDirectionOptions,
+} from './base-axes-calculator.js';
 
 /**
  * 축 위치 계산 유틸리티
@@ -9,18 +12,20 @@ import { calculateBaseAxes } from './base-axes-calculator.js';
  * @param cartesian 위성의 ECEF 좌표 (Cartesian3)
  * @param axis 축 종류 ('x' | 'y' | 'z')
  * @param axisLength 축 길이
+ * @param options 속도 방향(방위각/고도각 deg). 없으면 기존 동작
  * @returns 축 방향선의 시작점과 끝점 배열
  */
 export function getAxisLinePositions(
   cartesian: any,
   axis: 'x' | 'y' | 'z',
-  axisLength: number
+  axisLength: number,
+  options?: VelocityDirectionOptions
 ): any[] {
   if (!cartesian) {
     return [];
   }
 
-  const axes = calculateBaseAxes(cartesian);
+  const axes = calculateBaseAxes(cartesian, options);
   if (!axes) {
     return [];
   }
@@ -61,18 +66,20 @@ export function getAxisLinePositions(
  * @param cartesian 위성의 ECEF 좌표 (Cartesian3)
  * @param axis 축 종류 ('x' | 'y' | 'z')
  * @param axisLength 축 길이
+ * @param options 속도 방향(방위각/고도각 deg). 없으면 기존 동작
  * @returns 축 끝점 위치 (Cartesian3)
  */
 export function getAxisEndPosition(
   cartesian: any,
   axis: 'x' | 'y' | 'z',
-  axisLength: number
+  axisLength: number,
+  options?: VelocityDirectionOptions
 ): any | undefined {
   if (!cartesian) {
     return undefined;
   }
 
-  const axes = calculateBaseAxes(cartesian);
+  const axes = calculateBaseAxes(cartesian, options);
   if (!axes) {
     return undefined;
   }
