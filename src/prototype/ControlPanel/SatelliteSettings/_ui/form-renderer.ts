@@ -22,25 +22,11 @@ export function renderSatelliteSettingsForm(
   const section = document.createElement('div');
   section.className = 'sidebar-section';
 
-  const title = document.createElement('h3');
-  title.textContent = '위성 설정';
-  section.appendChild(title);
-
-  const description = document.createElement('p');
-  description.style.color = '#aaa';
-  description.style.fontSize = '12px';
-  description.style.marginTop = '10px';
-  description.textContent = '위성 BUS와 Payload(안테나)를 설정하고 생성합니다.';
-  section.appendChild(description);
-
   // Satellite settings form
   const form = document.createElement('div');
   form.style.marginTop = '15px';
 
-  // 위치 설정 섹션
-  const positionSection = createSection('위치 설정');
-  
-  // 위치 입력 필드
+  // 위치 입력 필드 (숨겨진 상태로 생성하여 기본값 사용)
   const lonInput = createInputField(
     '경도 (도):',
     'prototypeSatelliteLongitude',
@@ -51,7 +37,8 @@ export function renderSatelliteSettingsForm(
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  positionSection.appendChild(lonInput);
+  (lonInput.querySelector('input') as HTMLInputElement).style.display = 'none';
+  (lonInput as HTMLElement).style.display = 'none';
 
   const latInput = createInputField(
     '위도 (도):',
@@ -63,7 +50,8 @@ export function renderSatelliteSettingsForm(
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  positionSection.appendChild(latInput);
+  (latInput.querySelector('input') as HTMLInputElement).style.display = 'none';
+  (latInput as HTMLElement).style.display = 'none';
 
   const altInput = createInputField(
     '고도 (km):',
@@ -75,12 +63,20 @@ export function renderSatelliteSettingsForm(
     callbacks.onInputBlur,
     callbacks.onInputChange
   );
-  positionSection.appendChild(altInput);
+  (altInput.querySelector('input') as HTMLInputElement).style.display = 'none';
+  (altInput as HTMLElement).style.display = 'none';
 
-  form.appendChild(positionSection);
+  // 숨겨진 입력 필드를 form에 추가 (기본값 사용을 위해)
+  form.appendChild(lonInput);
+  form.appendChild(latInput);
+  form.appendChild(altInput);
 
   // BUS 설정 섹션
   const busSection = createSection('BUS 설정');
+  // 첫 번째 섹션이므로 구분선 제거, 적절한 상단 간격 유지
+  busSection.style.borderTop = 'none';
+  busSection.style.paddingTop = '0';
+  busSection.style.marginTop = '15px';
   
   const busLengthInput = createInputField(
     'BUS 길이 (mm):',
@@ -363,7 +359,7 @@ export function renderSatelliteSettingsForm(
   buttonSection.style.gap = '10px';
   buttonSection.style.flexDirection = 'column';
 
-  // 위성 엔티티 생성 버튼 (우주 공간에서 생성)
+  // 위성 엔티티 생성 버튼 (우주 공간에서 생성) - 숨김
   const createButton = document.createElement('button');
   createButton.textContent = '위성 엔티티 생성 (우주 공간)';
   createButton.style.padding = '10px';
@@ -372,6 +368,7 @@ export function renderSatelliteSettingsForm(
   createButton.style.border = 'none';
   createButton.style.borderRadius = '4px';
   createButton.style.cursor = 'pointer';
+  createButton.style.display = 'none'; // 숨김 처리
   if (callbacks.onCreateButtonClick) {
     createButton.addEventListener('click', callbacks.onCreateButtonClick);
   }
