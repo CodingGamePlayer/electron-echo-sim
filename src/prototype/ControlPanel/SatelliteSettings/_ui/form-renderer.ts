@@ -10,6 +10,7 @@ export interface FormRendererCallbacks {
   onInputChange?: () => void;
   onCreateButtonClick?: () => void;
   onAxisToggleChange?: (checked: boolean) => void;
+  onAxisLengthChange?: (length: number) => void;
 }
 
 /**
@@ -120,6 +121,25 @@ export function renderSatelliteSettingsForm(
 
   form.appendChild(busSection);
 
+  // 버스-안테나 간격 설정 섹션 (BUS 설정과 안테나 설정 사이)
+  const gapSection = createSection('버스-안테나 간격 설정');
+  const gapSectionTitle = gapSection.querySelector('h4');
+  if (gapSectionTitle) {
+    gapSection.removeChild(gapSectionTitle);
+  }
+  const antennaGapInput = createInputField(
+    '버스-안테나 간격 (mm):',
+    'prototypeAntennaGap',
+    'number',
+    '예: 100',
+    '100',
+    callbacks.onInputFocus,
+    callbacks.onInputBlur,
+    callbacks.onInputChange
+  );
+  gapSection.appendChild(antennaGapInput);
+  form.appendChild(gapSection);
+
   // 안테나 크기 설정 섹션
   const antennaSizeSection = createSection('안테나 크기 설정');
   // 타이틀 제거
@@ -165,28 +185,6 @@ export function renderSatelliteSettingsForm(
   antennaSizeSection.appendChild(antennaDepthInput);
 
   form.appendChild(antennaSizeSection);
-
-  // 버스-안테나 간격 설정 섹션
-  const gapSection = createSection('버스-안테나 간격 설정');
-  // 타이틀 제거
-  const gapSectionTitle = gapSection.querySelector('h4');
-  if (gapSectionTitle) {
-    gapSection.removeChild(gapSectionTitle);
-  }
-  
-  const antennaGapInput = createInputField(
-    '버스-안테나 간격 (mm):',
-    'prototypeAntennaGap',
-    'number',
-    '예: 100',
-    '100',
-    callbacks.onInputFocus,
-    callbacks.onInputBlur,
-    callbacks.onInputChange
-  );
-  gapSection.appendChild(antennaGapInput);
-
-  form.appendChild(gapSection);
 
   // 안테나 방향 파라미터 섹션
   const antennaOrientationSection = createSection('안테나 방향 파라미터');
@@ -424,6 +422,27 @@ export function renderSatelliteSettingsForm(
   axisToggleLabel.appendChild(axisToggle);
   axisToggleLabel.appendChild(axisToggleText);
   buttonSection.appendChild(axisToggleLabel);
+
+  // XYZ 축 길이 입력 필드
+  const axisLengthInput = createInputField(
+    'XYZ 축 길이 (m):',
+    'prototypeAxisLength',
+    'number',
+    '예: 0.2',
+    '0.2',
+    undefined,
+    undefined,
+    () => {
+      if (callbacks.onAxisLengthChange) {
+        const value = parseFloat((document.getElementById('prototypeAxisLength') as HTMLInputElement)?.value || '0.2');
+        if (!isNaN(value) && value > 0) {
+          callbacks.onAxisLengthChange(value);
+        }
+      }
+    }
+  );
+  axisLengthInput.style.marginTop = '15px';
+  buttonSection.appendChild(axisLengthInput);
 
   form.appendChild(buttonSection);
 

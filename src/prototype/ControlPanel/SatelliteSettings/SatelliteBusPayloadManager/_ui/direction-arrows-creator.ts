@@ -20,7 +20,18 @@ export function createDirectionArrows(
 } | null {
   // 안테나 관련 방향이고 안테나 위치가 제공된 경우 안테나 위치 사용
   const isAntennaDirection = direction.startsWith('antenna_');
-  const centerPosition = (isAntennaDirection && antennaPosition) ? antennaPosition : currentCartesian;
+  // Property인 경우 getValue로 Cartesian3를 구함 (초기 계산용)
+  const getCenterCartesian = (): any => {
+    if (!isAntennaDirection || !antennaPosition) return currentCartesian;
+    if (typeof antennaPosition.getValue === 'function' && viewer?.clock) {
+      const value = antennaPosition.getValue(viewer.clock.currentTime);
+      return value || currentCartesian;
+    }
+    return Array.isArray(antennaPosition) || (antennaPosition && typeof antennaPosition.x === 'number')
+      ? antennaPosition
+      : currentCartesian;
+  };
+  const centerPosition = getCenterCartesian();
   
   const busAxes = calculateBaseAxes(centerPosition);
   if (!busAxes) {

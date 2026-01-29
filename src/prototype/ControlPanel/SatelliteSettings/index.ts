@@ -149,6 +149,9 @@ export class SatelliteSettings {
       },
       onAxisToggleChange: (checked: boolean) => {
         this.setAxisVisible(checked);
+      },
+      onAxisLengthChange: (length: number) => {
+        this.setAxisLength(length);
       }
     };
 
@@ -305,6 +308,18 @@ export class SatelliteSettings {
 
     this.busPayloadManager.setAxisVisible(visible);
     console.log(`[SatelliteSettings] XYZ 축 표시: ${visible ? 'ON' : 'OFF'}`);
+  }
+
+  /**
+   * XYZ 축 길이 설정
+   */
+  private setAxisLength(length: number): void {
+    if (!this.busPayloadManager) {
+      return;
+    }
+
+    this.busPayloadManager.setAxisLength(length);
+    console.log(`[SatelliteSettings] XYZ 축 길이: ${length}m`);
   }
 
   /**

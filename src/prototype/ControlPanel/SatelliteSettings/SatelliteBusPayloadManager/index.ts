@@ -58,7 +58,7 @@ export class SatelliteBusPayloadManager {
     this.currentCartesian = null;
     this.axisEntities = null;
     this.antennaAxisEntities = null;
-    this.axisLength = 5; // 기본값: 1km
+    this.axisLength = 0.2; // 기본값: 0.2m
     this.axisVisible = true;
     this.busDimensions = null;
     this.antennaParams = null;
@@ -569,6 +569,37 @@ export class SatelliteBusPayloadManager {
    */
   setAxisLength(length: number): void {
     this.axisLength = length;
+    
+    // 축 길이 변경 시 축 재생성
+    if (this.axisEntities) {
+      // 기존 BUS 축 제거
+      if (this.axisEntities.xAxis) this.viewer.entities.remove(this.axisEntities.xAxis);
+      if (this.axisEntities.yAxis) this.viewer.entities.remove(this.axisEntities.yAxis);
+      if (this.axisEntities.zAxis) this.viewer.entities.remove(this.axisEntities.zAxis);
+      if (this.axisEntities.xLabel) this.viewer.entities.remove(this.axisEntities.xLabel);
+      if (this.axisEntities.yLabel) this.viewer.entities.remove(this.axisEntities.yLabel);
+      if (this.axisEntities.zLabel) this.viewer.entities.remove(this.axisEntities.zLabel);
+      this.axisEntities = null;
+    }
+    
+    if (this.antennaAxisEntities) {
+      // 기존 안테나 축 제거
+      if (this.antennaAxisEntities.xAxis) this.viewer.entities.remove(this.antennaAxisEntities.xAxis);
+      if (this.antennaAxisEntities.yAxis) this.viewer.entities.remove(this.antennaAxisEntities.yAxis);
+      if (this.antennaAxisEntities.zAxis) this.viewer.entities.remove(this.antennaAxisEntities.zAxis);
+      if (this.antennaAxisEntities.xLabel) this.viewer.entities.remove(this.antennaAxisEntities.xLabel);
+      if (this.antennaAxisEntities.yLabel) this.viewer.entities.remove(this.antennaAxisEntities.yLabel);
+      if (this.antennaAxisEntities.zLabel) this.viewer.entities.remove(this.antennaAxisEntities.zLabel);
+      this.antennaAxisEntities = null;
+    }
+    
+    // 새로운 길이로 축 재생성
+    if (this.currentCartesian) {
+      this.createAxisLines();
+    }
+    if (this.antennaEntity) {
+      this.createAntennaAxisLines();
+    }
   }
 
   /**
