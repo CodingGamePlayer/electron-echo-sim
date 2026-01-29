@@ -11,6 +11,7 @@ export class ControlPanelManager {
   private satelliteSettings: SatelliteSettings | null;
   private orbitSettings: OrbitSettings | null;
   private targetSettings: TargetSettings | null;
+  private viewer: any;
 
   constructor() {
     this.sidebar = null;
@@ -18,6 +19,7 @@ export class ControlPanelManager {
     this.satelliteSettings = null;
     this.orbitSettings = null;
     this.targetSettings = null;
+    this.viewer = null;
   }
 
   /**
@@ -32,6 +34,7 @@ export class ControlPanelManager {
    * 제어 패널 생성
    */
   private createControlPanel(viewer?: any): void {
+    this.viewer = viewer || null;
     // 기존 사이드바 확인
     this.sidebar = document.getElementById('sidebar');
     
@@ -142,6 +145,16 @@ export class ControlPanelManager {
         if (targetContent) {
           targetContent.classList.add('active');
         }
+
+        // 위성 설정 탭 클릭 시 위성 엔티티로 카메라 이동
+        if (targetTab === 'satellite' && this.satelliteSettings) {
+          this.satelliteSettings.flyToSatelliteEntity();
+        }
+
+        // 궤도 설정 탭 클릭 시 지구로 카메라 이동
+        if (targetTab === 'orbit' && this.viewer) {
+          this.flyToEarth();
+        }
       });
     });
   }
@@ -177,6 +190,30 @@ export class ControlPanelManager {
     }
     if (targetContent) {
       targetContent.classList.add('active');
+    }
+  }
+
+  /**
+   * 지구로 카메라 이동
+   */
+  private flyToEarth(): void {
+    if (!this.viewer) {
+      return;
+    }
+
+    try {
+      // 기존 카메라 애니메이션 취소
+      if (this.viewer.camera._flight && this.viewer.camera._flight.isActive()) {
+        this.viewer.camera.cancelFlight();
+      }
+
+      // trackedEntity 해제
+      this.viewer.trackedEntity = undefined;
+
+      // 지구로 카메라 이동 (flyHome 사용)
+      this.viewer.camera.flyHome(1.5); // 1.5초 동안 이동
+    } catch (error) {
+      console.error('[ControlPanelManager] 지구로 카메라 이동 오류:', error);
     }
   }
 

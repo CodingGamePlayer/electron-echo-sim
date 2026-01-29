@@ -343,6 +343,26 @@ export class SatelliteSettings {
 
 
   /**
+   * 위성 엔티티로 카메라 이동 (탭 전환 시 호출)
+   */
+  flyToSatelliteEntity(): void {
+    if (!this.viewer || !this.busPayloadManager) {
+      return;
+    }
+
+    const busEntity = this.busPayloadManager.getBusEntity();
+    if (!busEntity) {
+      // 엔티티가 없으면 초기 엔티티 생성 후 카메라 이동
+      this.createInitialEntity();
+      return;
+    }
+
+    // 엔티티가 있으면 카메라 이동
+    setupCameraAngle(this.viewer, busEntity);
+    setupCanvasFocus(this.viewer);
+  }
+
+  /**
    * Cleanup satellite settings
    */
   cleanup(): void {
