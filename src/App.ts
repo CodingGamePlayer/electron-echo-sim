@@ -79,8 +79,6 @@ export class App {
         this.hideCameraTrackButton();
       }
 
-      console.log(`[App] ${pageType} 페이지 로드 완료`);
-
     } catch (error) {
       console.error(`[App] ${pageType} 페이지 로드 오류:`, error);
     }

@@ -32,6 +32,7 @@ export class SatelliteBusPayloadManager {
     initialElevationAngle: number;
     initialAzimuthAngle: number;
   } | null;
+  private antennaGap: number; // 버스와 안테나 사이 간격 (미터)
 
   constructor(viewer: any) {
     this.viewer = viewer;
@@ -44,6 +45,7 @@ export class SatelliteBusPayloadManager {
     this.axisVisible = true;
     this.busDimensions = null;
     this.antennaParams = null;
+    this.antennaGap = 0.001; // 기본값: 1mm (미터 단위)
   }
 
   /**
@@ -62,19 +64,13 @@ export class SatelliteBusPayloadManager {
       yawAngle: number;
       initialElevationAngle: number;
       initialAzimuthAngle: number;
-    }
+    },
+    antennaGap?: number // 버스와 안테나 사이 간격 (미터)
   ): void {
     if (!this.viewer) {
       console.error('[SatelliteBusPayloadManager] Viewer가 없습니다.');
       return;
     }
-
-    console.log('[SatelliteBusPayloadManager] 위성 엔티티 생성 시작:', {
-      name,
-      position,
-      busDimensions,
-      antennaParams
-    });
 
     // 기존 엔티티 제거
     this.removeSatellite();
@@ -91,6 +87,7 @@ export class SatelliteBusPayloadManager {
     // 파라미터 저장
     this.busDimensions = busDimensions;
     this.antennaParams = antennaParams;
+    this.antennaGap = antennaGap !== undefined ? antennaGap : 0.001; // 기본값: 1mm
 
     // BUS 기본 방향 계산
     const busAxes = calculateBaseAxes(this.currentCartesian);
@@ -124,8 +121,6 @@ export class SatelliteBusPayloadManager {
         },
         show: true,
       });
-
-      console.log('[SatelliteBusPayloadManager] BUS 엔티티 생성 완료:', this.busEntity);
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] BUS 엔티티 생성 오류:', error);
       return;
@@ -133,10 +128,10 @@ export class SatelliteBusPayloadManager {
 
     // 안테나 위치 계산 (BUS의 Y축 방향)
     try {
-      // BUS의 Y축 방향으로 안테나 위치 설정 (BUS 크기의 절반 + 약간의 간격)
+      // BUS의 Y축 방향으로 안테나 위치 설정 (BUS 크기의 절반 + 안테나 깊이의 절반 + 간격)
       const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
         busAxes.yAxis,
-        busDimensions.width / 2 + antennaParams.depth / 2 + 1,
+        busDimensions.width / 2 + antennaParams.depth / 2 + this.antennaGap,
         new Cesium.Cartesian3()
       );
       const antennaPosition = Cesium.Cartesian3.add(
@@ -174,8 +169,6 @@ export class SatelliteBusPayloadManager {
         },
         show: true,
       });
-
-      console.log('[SatelliteBusPayloadManager] 안테나 엔티티 생성 완료:', this.antennaEntity);
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] 안테나 엔티티 생성 오류:', error);
     }
@@ -183,7 +176,6 @@ export class SatelliteBusPayloadManager {
     // XYZ 축 생성
     try {
       this.createAxisLines();
-      console.log('[SatelliteBusPayloadManager] XYZ 축 생성 완료');
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] XYZ 축 생성 오류:', error);
     }
@@ -355,7 +347,7 @@ export class SatelliteBusPayloadManager {
         if (this.antennaEntity && this.antennaParams) {
           const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
             busAxes.yAxis,
-            this.busDimensions.width / 2 + this.antennaParams.depth / 2 + 1,
+            this.busDimensions.width / 2 + this.antennaParams.depth / 2 + this.antennaGap,
             new Cesium.Cartesian3()
           );
           const antennaPosition = Cesium.Cartesian3.add(
@@ -410,7 +402,7 @@ export class SatelliteBusPayloadManager {
         if (busAxes) {
           const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
             busAxes.yAxis,
-            dimensions.width / 2 + this.antennaParams.depth / 2 + 1,
+            dimensions.width / 2 + this.antennaParams.depth / 2 + this.antennaGap,
             new Cesium.Cartesian3()
           );
           const antennaPosition = Cesium.Cartesian3.add(
@@ -456,7 +448,7 @@ export class SatelliteBusPayloadManager {
         if (busAxes) {
           const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
             busAxes.yAxis,
-            this.busDimensions.width / 2 + dimensions.depth / 2 + 1,
+            this.busDimensions.width / 2 + dimensions.depth / 2 + this.antennaGap,
             new Cesium.Cartesian3()
           );
           const antennaPosition = Cesium.Cartesian3.add(
@@ -472,6 +464,40 @@ export class SatelliteBusPayloadManager {
       console.log('[SatelliteBusPayloadManager] 안테나 크기 업데이트 완료:', dimensions);
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] 안테나 크기 업데이트 오류:', error);
+    }
+  }
+
+  /**
+   * 버스와 안테나 사이 간격 업데이트
+   */
+  updateAntennaGap(gap: number): void {
+    if (!this.antennaEntity || !this.busDimensions || !this.antennaParams || !this.currentCartesian) {
+      return;
+    }
+
+    try {
+      this.antennaGap = gap;
+
+      // 안테나 위치 재계산
+      const busAxes = calculateBaseAxes(this.currentCartesian);
+      if (busAxes) {
+        const antennaOffset = Cesium.Cartesian3.multiplyByScalar(
+          busAxes.yAxis,
+          this.busDimensions.width / 2 + this.antennaParams.depth / 2 + this.antennaGap,
+          new Cesium.Cartesian3()
+        );
+        const antennaPosition = Cesium.Cartesian3.add(
+          this.currentCartesian,
+          antennaOffset,
+          new Cesium.Cartesian3()
+        );
+        const antennaPositionProperty = new Cesium.ConstantPositionProperty(antennaPosition);
+        this.antennaEntity.position = antennaPositionProperty;
+      }
+
+      console.log('[SatelliteBusPayloadManager] 안테나 간격 업데이트 완료:', gap);
+    } catch (error) {
+      console.error('[SatelliteBusPayloadManager] 안테나 간격 업데이트 오류:', error);
     }
   }
 
@@ -529,6 +555,7 @@ export class SatelliteBusPayloadManager {
       initialElevationAngle: number;
       initialAzimuthAngle: number;
     };
+    antennaGap?: number;
   }): void {
     if (params.position) {
       this.updatePosition(params.position);
@@ -541,6 +568,9 @@ export class SatelliteBusPayloadManager {
     }
     if (params.antennaOrientation) {
       this.updateAntennaOrientation(params.antennaOrientation);
+    }
+    if (params.antennaGap !== undefined) {
+      this.updateAntennaGap(params.antennaGap);
     }
   }
 

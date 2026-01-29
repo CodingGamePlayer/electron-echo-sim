@@ -572,6 +572,33 @@ html, body, #cesiumContainer {
   box-sizing: border-box;
   font-size: 12px;
   margin-top: 4px;
+  /* 입력 필드가 확실히 편집 가능하도록 보장 */
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+  /* 포커스 스타일 */
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 포커스 상태 스타일 */
+.sidebar-section input[type="text"]:focus,
+.sidebar-section input[type="number"]:focus,
+.sidebar-section select:focus,
+.sidebar-section textarea:focus {
+  border: 2px solid #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* 포커스 상태에서 outline 제거 (border로 대체) */
+.sidebar-section input[type="text"]:focus-visible,
+.sidebar-section input[type="number"]:focus-visible,
+.sidebar-section select:focus-visible,
+.sidebar-section textarea:focus-visible {
+  outline: none;
 }
 
 /* readonly 필드 스타일 - 약간 더 어두운 배경으로 구분 */

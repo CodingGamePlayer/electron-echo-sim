@@ -20,8 +20,6 @@ export class PrototypePage {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('[PrototypePage] Prototype 페이지 초기화 시작');
-
       // 기존 Cesium 뷰어 정리
       this.cleanupCesiumViewer();
 
@@ -48,8 +46,6 @@ export class PrototypePage {
       // 5. 제어 패널 초기화
       this.controlPanelManager = new ControlPanelManager();
       this.controlPanelManager.initialize(this.viewer);
-
-      console.log('[PrototypePage] Prototype 페이지 초기화 완료');
       
     } catch (error) {
       console.error('[PrototypePage] 초기화 오류:', error);
