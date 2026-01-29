@@ -72,7 +72,7 @@ export function renderSatelliteSettingsForm(
     'prototypeSatelliteLongitude',
     'number',
     '-180 ~ 180',
-    '0',
+    '127.5',
     callbacks.onInputFocus,
     callbacks.onInputBlur,
     callbacks.onInputChange
@@ -84,7 +84,7 @@ export function renderSatelliteSettingsForm(
     'prototypeSatelliteLatitude',
     'number',
     '-90 ~ 90',
-    '0',
+    '37.5',
     callbacks.onInputFocus,
     callbacks.onInputBlur,
     callbacks.onInputChange
@@ -415,10 +415,11 @@ export function renderSatelliteSettingsForm(
   axisToggle.type = 'checkbox';
   axisToggle.id = 'prototypeAxisToggle';
   axisToggle.checked = true;
-  if (callbacks.onAxisToggleChange) {
+  const onAxisToggleChange = callbacks.onAxisToggleChange;
+  if (onAxisToggleChange) {
     axisToggle.addEventListener('change', (e) => {
       const checked = (e.target as HTMLInputElement).checked;
-      callbacks.onAxisToggleChange(checked);
+      onAxisToggleChange(checked);
     });
   }
 

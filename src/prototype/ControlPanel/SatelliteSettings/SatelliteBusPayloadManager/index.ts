@@ -256,6 +256,20 @@ export class SatelliteBusPayloadManager {
         }
       }
 
+      // XYZ 축 재생성 (currentCartesian 업데이트 반영)
+      if (this.axisEntities) {
+        // 기존 축 제거
+        if (this.axisEntities.xAxis) this.viewer.entities.remove(this.axisEntities.xAxis);
+        if (this.axisEntities.yAxis) this.viewer.entities.remove(this.axisEntities.yAxis);
+        if (this.axisEntities.zAxis) this.viewer.entities.remove(this.axisEntities.zAxis);
+        if (this.axisEntities.xLabel) this.viewer.entities.remove(this.axisEntities.xLabel);
+        if (this.axisEntities.yLabel) this.viewer.entities.remove(this.axisEntities.yLabel);
+        if (this.axisEntities.zLabel) this.viewer.entities.remove(this.axisEntities.zLabel);
+        
+        // 새로운 위치로 축 재생성
+        this.createAxisLines();
+      }
+
       console.log('[SatelliteBusPayloadManager] 위치 업데이트 완료:', position);
     } catch (error) {
       console.error('[SatelliteBusPayloadManager] 위치 업데이트 오류:', error);

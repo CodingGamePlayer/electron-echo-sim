@@ -114,6 +114,20 @@ export function createSatelliteEntity(
 }
 
 /**
+ * 카메라 거리 계산 (BUS 크기 기반)
+ */
+export function calculateCameraRange(): number {
+  // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
+  const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
+  const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
+  const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
+  const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
+  
+  // BUS 크기의 10배 정도 거리에서 보면 적절함 (엔티티가 잘 보이도록)
+  return Math.max(maxBusSize * 10, 3); // 최소 3m, BUS 크기의 10배
+}
+
+/**
  * 카메라 각도 설정
  */
 export function setupCameraAngle(
@@ -136,15 +150,8 @@ export function setupCameraAngle(
 
   console.log('[setupCameraAngle] BUS 위치:', busPosition);
 
-  // BUS 크기 정보로 적절한 거리 계산 (mm를 미터로 변환)
-  const busLengthMm = parseFloat((document.getElementById('prototypeBusLength') as HTMLInputElement)?.value || '800');
-  const busWidthMm = parseFloat((document.getElementById('prototypeBusWidth') as HTMLInputElement)?.value || '700');
-  const busHeightMm = parseFloat((document.getElementById('prototypeBusHeight') as HTMLInputElement)?.value || '840');
-  const maxBusSize = Math.max(busLengthMm, busWidthMm, busHeightMm) / 1000;
-  
-  // 대각선에서 바라보는 각도 설정
-  // BUS 크기의 3배 정도 거리에서 보면 적절함 (엔티티가 잘 보이도록)
-  const cameraRange = Math.max(maxBusSize * 10, 3); // 최소 3m, 최대 BUS 크기의 3배
+  // 공통 함수로 카메라 거리 계산
+  const cameraRange = calculateCameraRange();
   
   console.log('[setupCameraAngle] 카메라 범위:', cameraRange, 'm');
   console.log('[setupCameraAngle] Heading: 45도, Pitch: -45도, Range:', cameraRange, 'm');
@@ -174,7 +181,7 @@ export function setupCameraAngle(
             busPosition,
             new Cesium.HeadingPitchRange(
               Cesium.Math.toRadians(45), // heading: 대각선 방향
-              Cesium.Math.toRadians(-30), // pitch: 위에서 45도 각도로 내려다보기
+              Cesium.Math.toRadians(-45), // pitch: 위에서 45도 각도로 내려다보기
               cameraRange
             )
           );
@@ -188,8 +195,8 @@ export function setupCameraAngle(
       viewer.camera.lookAt(
         busPosition,
         new Cesium.HeadingPitchRange(
-          Cesium.Math.toRadians(30), // heading: 대각선 방향
-          Cesium.Math.toRadians(-30), // pitch: 위에서 45도 각도로 내려다보기
+          Cesium.Math.toRadians(45), // heading: 대각선 방향
+          Cesium.Math.toRadians(-45), // pitch: 위에서 45도 각도로 내려다보기
           cameraRange
         )
       );

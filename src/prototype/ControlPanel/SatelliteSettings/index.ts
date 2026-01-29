@@ -90,12 +90,12 @@ export class SatelliteSettings {
     // 기본값으로 엔티티 직접 생성
     try {
       // 입력 필드에서 위치 정보 가져오기 (기본값 사용)
-      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || '0';
-      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || '0';
+      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || '127.5';
+      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || '37.5';
       const altInput = (document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || '591';
       
-      const longitude = parseFloat(lonInput) || 0;
-      const latitude = parseFloat(latInput) || 0;
+      const longitude = parseFloat(lonInput) || 127.5;
+      const latitude = parseFloat(latInput) || 37.5;
       const altitudeKm = parseFloat(altInput) || 591;
       
       // km를 미터로 변환 (Cesium은 미터 단위 사용)
