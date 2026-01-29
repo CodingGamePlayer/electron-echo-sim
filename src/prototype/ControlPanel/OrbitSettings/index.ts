@@ -38,13 +38,6 @@ export class OrbitSettings {
     title.textContent = '궤도 설정';
     section.appendChild(title);
 
-    const description = document.createElement('p');
-    description.style.color = '#aaa';
-    description.style.fontSize = '12px';
-    description.style.marginTop = '10px';
-    description.textContent = '궤도 6요소를 입력하여 위성 궤도를 그립니다.';
-    section.appendChild(description);
-
     // Orbit settings form
     const form = document.createElement('div');
     form.style.marginTop = '15px';
@@ -62,7 +55,7 @@ export class OrbitSettings {
     // 1. a (Semi-major Axis) - 긴반지름
     const semiMajorAxisInput = this.createInputField(
       form,
-      'a - 긴반지름 (km):',
+      'a - 긴반지름 (Semi-major Axis) (km):',
       'prototypeOrbitSemiMajorAxis',
       String(RADARSAT_RCM.semiMajorAxis),
       '100',
@@ -73,7 +66,7 @@ export class OrbitSettings {
     // 2. e (Eccentricity) - 이심률
     const eccentricityInput = this.createInputField(
       form,
-      'e - 이심률:',
+      'e - 이심률 (Eccentricity):',
       'prototypeOrbitEccentricity',
       String(RADARSAT_RCM.eccentricity),
       '0',
@@ -84,7 +77,7 @@ export class OrbitSettings {
     // 3. i (Inclination) - 궤도 경사각
     const inclinationInput = this.createInputField(
       form,
-      'i - 궤도 경사각 (deg):',
+      'i - 궤도 경사각 (Inclination) (deg):',
       'prototypeOrbitInclination',
       String(RADARSAT_RCM.inclination),
       '0',
@@ -95,7 +88,7 @@ export class OrbitSettings {
     // 4. Ω (RAAN) - 승교점 적경
     const raanInput = this.createInputField(
       form,
-      'Ω - 승교점 적경 (deg):',
+      'Ω - 승교점 적경 (RAAN) (deg):',
       'prototypeOrbitRAAN',
       String(RADARSAT_RCM.raan),
       '0',
@@ -106,7 +99,7 @@ export class OrbitSettings {
     // 5. ω (Argument of Perigee) - 근지점 편각
     const argumentOfPerigeeInput = this.createInputField(
       form,
-      'ω - 근지점 편각 (deg):',
+      'ω - 근지점 편각 (Argument of Perigee) (deg):',
       'prototypeOrbitArgumentOfPerigee',
       String(RADARSAT_RCM.argumentOfPerigee),
       '0',
@@ -118,7 +111,7 @@ export class OrbitSettings {
     const anomalyTypeLabel = document.createElement('label');
     anomalyTypeLabel.style.marginTop = '10px';
     anomalyTypeLabel.style.display = 'block';
-    anomalyTypeLabel.textContent = '이각 타입:';
+    anomalyTypeLabel.textContent = '이각 타입 (Anomaly Type):';
     
     const anomalyTypeSelect = document.createElement('select');
     anomalyTypeSelect.id = 'prototypeOrbitAnomalyType';
@@ -128,12 +121,12 @@ export class OrbitSettings {
     
     const trueAnomalyOption = document.createElement('option');
     trueAnomalyOption.value = 'true';
-    trueAnomalyOption.textContent = 'ν (진근점이각)';
+    trueAnomalyOption.textContent = 'ν (진근점이각, True Anomaly)';
     anomalyTypeSelect.appendChild(trueAnomalyOption);
     
     const meanAnomalyOption = document.createElement('option');
     meanAnomalyOption.value = 'mean';
-    meanAnomalyOption.textContent = 'M (평균근점이각)';
+    meanAnomalyOption.textContent = 'M (평균근점이각, Mean Anomaly)';
     meanAnomalyOption.selected = true; // RADARSAT RCM은 평균근점이각 사용
     anomalyTypeSelect.appendChild(meanAnomalyOption);
     
@@ -142,7 +135,7 @@ export class OrbitSettings {
 
     const anomalyInput = this.createInputField(
       form,
-      'ν 또는 M - 이각 (deg):',
+      'ν 또는 M - 이각 (True/Mean Anomaly) (deg):',
       'prototypeOrbitAnomaly',
       String(RADARSAT_RCM.meanAnomaly), // RADARSAT RCM 평균근점이각
       '0',
