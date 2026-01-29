@@ -67,7 +67,7 @@ export function createSatelliteEntity(
     return false;
   }
 
-  const antennaGapMm = parseFloat((document.getElementById('prototypeAntennaGap') as HTMLInputElement)?.value || '1');
+  const antennaGapMm = parseFloat((document.getElementById('prototypeAntennaGap') as HTMLInputElement)?.value || '100');
   const antennaGap = antennaGapMm / 1000;
 
   const antennaOrientation = parseAntennaOrientationInputs();
@@ -78,15 +78,14 @@ export function createSatelliteEntity(
     return false;
   }
 
-  // 엔티티 생성 (우주 공간에서 생성 - 지구에서 멀리 떨어진 곳)
+  // 엔티티 생성 (입력된 좌표와 고도에 생성)
   try {
-    // 우주 공간에서 생성 (지구에서 멀리 떨어진 위치)
-    // 경도/위도는 입력값 사용하되, 고도는 매우 높게 설정하여 지구와 멀리 떨어뜨림
-    const spaceAltitude = 50000000; // 50,000km (지구 반지름의 약 8배)
+    // km를 미터로 변환 (Cesium은 미터 단위 사용)
+    const altitude = position.altitudeKm * 1000;
 
     busPayloadManager.createSatellite(
       name,
-      { longitude: position.longitude, latitude: position.latitude, altitude: spaceAltitude },
+      { longitude: position.longitude, latitude: position.latitude, altitude },
       busDimensions,
       {
         height: antennaDimensions.height,

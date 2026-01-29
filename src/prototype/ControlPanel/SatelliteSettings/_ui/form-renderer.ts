@@ -194,8 +194,8 @@ export function renderSatelliteSettingsForm(
     '버스-안테나 간격 (mm):',
     'prototypeAntennaGap',
     'number',
-    '예: 1',
-    '1',
+    '예: 100',
+    '100',
     callbacks.onInputFocus,
     callbacks.onInputBlur,
     callbacks.onInputChange

@@ -53,7 +53,7 @@ export class SatelliteBusPayloadManager {
     this.axisVisible = true;
     this.busDimensions = null;
     this.antennaParams = null;
-    this.antennaGap = 0.001; // 기본값: 1mm (미터 단위)
+    this.antennaGap = 0.1; // 기본값: 100mm (미터 단위)
     this.directionArrows = null;
   }
 
@@ -96,7 +96,7 @@ export class SatelliteBusPayloadManager {
     // 파라미터 저장
     this.busDimensions = busDimensions;
     this.antennaParams = antennaParams;
-    this.antennaGap = antennaGap !== undefined ? antennaGap : 0.001; // 기본값: 1mm
+    this.antennaGap = antennaGap !== undefined ? antennaGap : 0.1; // 기본값: 100mm
 
     // BUS 기본 방향 계산
     const busAxes = calculateBaseAxes(this.currentCartesian);

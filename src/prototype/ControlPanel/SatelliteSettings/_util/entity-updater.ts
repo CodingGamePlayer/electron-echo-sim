@@ -33,12 +33,12 @@ export function updateEntity(
     // 위치 정보 업데이트
     const position = parsePositionInputs();
     if (position) {
-      // 위치 수정 시에도 우주 공간(50,000km)에 생성되도록 고도 고정
-      const spaceAltitude = 50000000; // 50,000km (지구 반지름의 약 8배)
+      // km를 미터로 변환 (Cesium은 미터 단위 사용)
+      const altitude = position.altitudeKm * 1000;
       busPayloadManager.updatePosition({
         longitude: position.longitude,
         latitude: position.latitude,
-        altitude: spaceAltitude
+        altitude
       });
     }
 

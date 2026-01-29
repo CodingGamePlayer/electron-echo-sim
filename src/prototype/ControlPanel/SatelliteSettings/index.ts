@@ -89,11 +89,23 @@ export class SatelliteSettings {
 
     // 기본값으로 엔티티 직접 생성
     try {
-      const spaceAltitude = 50000000; // 50,000km (지구 반지름의 약 8배)
+      // 입력 필드에서 위치 정보 가져오기 (기본값 사용)
+      const lonInput = (document.getElementById('prototypeSatelliteLongitude') as HTMLInputElement)?.value || '0';
+      const latInput = (document.getElementById('prototypeSatelliteLatitude') as HTMLInputElement)?.value || '0';
+      const altInput = (document.getElementById('prototypeSatelliteAltitude') as HTMLInputElement)?.value || '591';
+      
+      const longitude = parseFloat(lonInput) || 0;
+      const latitude = parseFloat(latInput) || 0;
+      const altitudeKm = parseFloat(altInput) || 591;
+      
+      // km를 미터로 변환 (Cesium은 미터 단위 사용)
+      const altitude = altitudeKm * 1000;
+      
+      console.log('[SatelliteSettings] 엔티티 위치:', { longitude, latitude, altitudeKm, altitude });
       
       this.busPayloadManager.createSatellite(
         'Satellite-1',
-        { longitude: 0, latitude: 0, altitude: spaceAltitude },
+        { longitude, latitude, altitude },
         { length: 0.8, width: 0.7, height: 0.84 }, // mm를 미터로 변환: 800mm, 700mm, 840mm
         {
           height: 0.8,    // 800mm
@@ -105,7 +117,7 @@ export class SatelliteSettings {
           initialElevationAngle: 0,
           initialAzimuthAngle: 0,
         },
-        0.001 // 1mm
+        0.1 // 100mm (미터 단위)
       );
 
       console.log('[SatelliteSettings] 초기 엔티티 생성 완료');
