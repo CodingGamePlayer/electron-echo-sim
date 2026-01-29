@@ -181,7 +181,7 @@ export class OrbitSettings {
     }
     
     this.updateDebounceTimer = window.setTimeout(() => {
-      this.drawOrbit();
+      this.drawOrbit(false); // 값 변경 시 alert 표시 안 함
       this.updateDebounceTimer = null;
     }, 500); // 500ms 디바운스
   }
