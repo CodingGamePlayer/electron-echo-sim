@@ -110,7 +110,7 @@ export class ControlPanelManager {
     this.satelliteSettings.initialize(satelliteTabContent, viewer);
 
     this.orbitSettings = new OrbitSettings();
-    this.orbitSettings.initialize(orbitTabContent);
+    this.orbitSettings.initialize(orbitTabContent, viewer);
 
     this.targetSettings = new TargetSettings();
     this.targetSettings.initialize(targetTabContent);
