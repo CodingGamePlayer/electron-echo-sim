@@ -28,8 +28,8 @@ export class App {
       // 2. 메뉴 클릭 이벤트 등록
       this.setupMenuHandlers();
 
-      // 3. 기본으로 PoC 페이지 로드
-      await this.loadPage('poc');
+      // 3. 기본으로 Prototype 페이지 로드
+      await this.loadPage('prototype');
 
     } catch (error) {
       console.error('[App] 초기화 오류:', error);

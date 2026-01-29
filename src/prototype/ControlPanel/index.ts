@@ -23,15 +23,15 @@ export class ControlPanelManager {
   /**
    * 제어 패널 초기화
    */
-  initialize(): void {
-    this.createControlPanel();
+  initialize(viewer?: any): void {
+    this.createControlPanel(viewer);
     this.setupStyles();
   }
 
   /**
    * 제어 패널 생성
    */
-  private createControlPanel(): void {
+  private createControlPanel(viewer?: any): void {
     // 기존 사이드바 확인
     this.sidebar = document.getElementById('sidebar');
     
@@ -103,7 +103,7 @@ export class ControlPanelManager {
 
     // 각 설정 클래스 초기화
     this.satelliteSettings = new SatelliteSettings();
-    this.satelliteSettings.initialize(satelliteTabContent);
+    this.satelliteSettings.initialize(satelliteTabContent, viewer);
 
     this.orbitSettings = new OrbitSettings();
     this.orbitSettings.initialize(orbitTabContent);

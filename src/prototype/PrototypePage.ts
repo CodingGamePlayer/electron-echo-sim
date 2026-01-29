@@ -47,7 +47,7 @@ export class PrototypePage {
 
       // 5. 제어 패널 초기화
       this.controlPanelManager = new ControlPanelManager();
-      this.controlPanelManager.initialize();
+      this.controlPanelManager.initialize(this.viewer);
 
       console.log('[PrototypePage] Prototype 페이지 초기화 완료');
       

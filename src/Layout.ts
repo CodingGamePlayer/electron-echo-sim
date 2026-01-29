@@ -30,6 +30,17 @@ export class Layout {
     menuSidebar.id = 'menuSidebar';
     menuSidebar.className = 'menu-sidebar';
 
+    // Prototype 메뉴 항목 (기본)
+    const prototypeMenuItem = document.createElement('div');
+    prototypeMenuItem.className = 'menu-item';
+    prototypeMenuItem.id = 'menu-prototype';
+    prototypeMenuItem.setAttribute('data-page', 'prototype');
+    prototypeMenuItem.innerHTML = `
+      <div class="menu-icon">🚀</div>
+      <div class="menu-label">Prototype</div>
+    `;
+    menuSidebar.appendChild(prototypeMenuItem);
+
     // PoC 메뉴 항목
     const pocMenuItem = document.createElement('div');
     pocMenuItem.className = 'menu-item';
@@ -40,17 +51,6 @@ export class Layout {
       <div class="menu-label">PoC</div>
     `;
     menuSidebar.appendChild(pocMenuItem);
-
-    // Prototype 메뉴 항목
-    const prototypeMenuItem = document.createElement('div');
-    prototypeMenuItem.className = 'menu-item';
-    prototypeMenuItem.id = 'menu-prototype';
-    prototypeMenuItem.setAttribute('data-page', 'prototype');
-    prototypeMenuItem.innerHTML = `
-      <div class="menu-icon">🚀</div>
-      <div class="menu-label">Prototype</div>
-    `;
-    menuSidebar.appendChild(prototypeMenuItem);
 
     document.body.appendChild(menuSidebar);
     this.menuSidebar = menuSidebar;
@@ -83,8 +83,8 @@ export class Layout {
       });
     });
 
-    // 첫 번째 메뉴 항목(PoC)을 기본 활성화
-    const firstMenuItem = this.menuSidebar.querySelector('#menu-poc');
+    // 첫 번째 메뉴 항목(Prototype)을 기본 활성화
+    const firstMenuItem = this.menuSidebar.querySelector('#menu-prototype');
     if (firstMenuItem) {
       this.setActiveMenuItem(firstMenuItem as HTMLElement);
     }

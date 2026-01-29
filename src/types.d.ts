@@ -7,6 +7,7 @@ declare namespace Cesium {
   
   namespace Cartesian3 {
     function fromDegrees(longitude: number, latitude: number, height?: number): Cartesian3;
+    function fromRadians(longitude: number, latitude: number, height?: number, result?: Cartesian3): Cartesian3;
     function normalize(cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
     function multiplyByScalar(cartesian: Cartesian3, scalar: number, result?: Cartesian3): Cartesian3;
     function add(left: Cartesian3, right: Cartesian3, result?: Cartesian3): Cartesian3;
@@ -15,6 +16,8 @@ declare namespace Cesium {
     function distance(left: Cartesian3, right: Cartesian3): number;
     function lerp(start: Cartesian3, end: Cartesian3, t: number, result?: Cartesian3): Cartesian3;
     function negate(cartesian: Cartesian3, result?: Cartesian3): Cartesian3;
+    function magnitude(cartesian: Cartesian3): number;
+    function dot(left: Cartesian3, right: Cartesian3): number;
   }
   class Cartesian3 {
     constructor(x?: number, y?: number, z?: number);
@@ -254,6 +257,42 @@ declare namespace Cesium {
     SHIFT = 1,
     CTRL = 2,
     ALT = 4
+  }
+  
+  // HeadingPitchRange 관련
+  class HeadingPitchRange {
+    constructor(heading?: number, pitch?: number, range?: number);
+    heading: number;
+    pitch: number;
+    range: number;
+  }
+  
+  class HeadingPitchRoll {
+    constructor(heading?: number, pitch?: number, roll?: number);
+    heading: number;
+    pitch: number;
+    roll: number;
+  }
+  
+  // Transforms 관련
+  namespace Transforms {
+    function headingPitchRollQuaternion(position: Cartesian3, headingPitchRoll: HeadingPitchRoll, result?: Quaternion): Quaternion;
+  }
+  
+  // Camera 관련
+  class Camera {
+    position: Cartesian3;
+    orientation: Quaternion;
+    lookAt(target: Cartesian3, offset: HeadingPitchRange | Cartesian3): void;
+    flyTo(options: {
+      destination?: Cartesian3;
+      orientation?: {
+        heading?: number;
+        pitch?: number;
+        roll?: number;
+      };
+      duration?: number;
+    }): void;
   }
 }
 declare var Cesium: typeof Cesium;
