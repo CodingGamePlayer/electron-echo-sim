@@ -28,7 +28,10 @@ export class App {
       // 2. 메뉴 클릭 이벤트 등록
       this.setupMenuHandlers();
 
-      // 3. 기본으로 Prototype 페이지 로드
+      // 3. 프로토타입 메뉴를 기본으로 활성화
+      this.layout.setActiveMenu('prototype');
+
+      // 4. 기본으로 Prototype 페이지 로드
       await this.loadPage('prototype');
 
     } catch (error) {

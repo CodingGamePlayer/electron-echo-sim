@@ -271,4 +271,16 @@ export class Layout {
   removeMenuClickCallback(pageId: string): void {
     this.menuClickCallbacks.delete(pageId);
   }
+
+  /**
+   * 특정 메뉴 항목을 활성화 (서버 초기화 시 사용)
+   */
+  setActiveMenu(pageId: string): void {
+    if (!this.menuSidebar) return;
+    
+    const menuItem = this.menuSidebar.querySelector(`#menu-${pageId}`) as HTMLElement;
+    if (menuItem) {
+      this.setActiveMenuItem(menuItem);
+    }
+  }
 }

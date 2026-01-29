@@ -113,6 +113,9 @@ export class ControlPanelManager {
 
     // 탭 전환 이벤트 설정
     this.setupTabEvents();
+
+    // 기본으로 위성 설정 탭 활성화 (서버 초기화 시)
+    this.activateTab('satellite');
   }
 
   /**
@@ -147,6 +150,33 @@ export class ControlPanelManager {
    */
   private setupStyles(): void {
     // 필요한 경우 추가 스타일 설정
+  }
+
+  /**
+   * 특정 탭 활성화 (서버 초기화 시 사용)
+   */
+  private activateTab(tabId: string): void {
+    const tabButtons = this.sidebarContent?.querySelectorAll('.tab-button');
+    const tabContents = this.sidebarContent?.querySelectorAll('.tab-content');
+
+    if (!tabButtons || !tabContents) return;
+
+    // 모든 탭 버튼과 콘텐츠에서 active 클래스 제거
+    tabButtons.forEach((btn) => btn.classList.remove('active'));
+    tabContents.forEach((content) => content.classList.remove('active'));
+
+    // 지정된 탭 버튼과 콘텐츠에 active 클래스 추가
+    const targetButton = Array.from(tabButtons).find(
+      (btn) => btn.getAttribute('data-tab') === tabId
+    ) as HTMLElement;
+    const targetContent = this.sidebarContent?.querySelector(`#${tabId}Tab`) as HTMLElement;
+
+    if (targetButton) {
+      targetButton.classList.add('active');
+    }
+    if (targetContent) {
+      targetContent.classList.add('active');
+    }
   }
 
   /**
