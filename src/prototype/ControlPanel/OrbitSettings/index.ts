@@ -1,4 +1,9 @@
-import { calculateOrbitPath, calculateOrbitalPeriod, OrbitalElements } from './_util/orbit-calculator.js';
+import {
+  calculateOrbitPath,
+  calculateOrbitalPeriod,
+  computeInitialTrueAnomalyFromPosition,
+  OrbitalElements,
+} from './_util/orbit-calculator.js';
 
 /**
  * OrbitSettings - Orbit settings tab management class
@@ -37,6 +42,42 @@ export class OrbitSettings {
     // Orbit settings form
     const form = document.createElement('div');
     form.style.marginTop = '15px';
+
+    // 초기 위치 / 초기 시각 (궤도 그리기 시작점) — 기본값: 서울
+    const initialLatitudeInput = this.createInputField(
+      form,
+      '초기 위치 위도 (deg):',
+      'prototypeOrbitInitialLatitude',
+      '37.5665',
+      '-90',
+      '90',
+      '0.1'
+    );
+    const initialLongitudeInput = this.createInputField(
+      form,
+      '초기 위치 경도 (deg):',
+      'prototypeOrbitInitialLongitude',
+      '126.978',
+      '-180',
+      '180',
+      '0.1'
+    );
+    const initialTimeLabel = document.createElement('label');
+    initialTimeLabel.style.marginTop = '10px';
+    initialTimeLabel.style.display = 'block';
+    initialTimeLabel.textContent = '초기 시각 (Initial Time):';
+    const initialTimeInput = document.createElement('input');
+    initialTimeInput.type = 'datetime-local';
+    initialTimeInput.id = 'prototypeOrbitInitialTime';
+    initialTimeInput.style.width = '100%';
+    initialTimeInput.style.marginTop = '4px';
+    initialTimeInput.style.padding = '4px';
+    const now = new Date();
+    initialTimeInput.value =
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T` +
+      `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    initialTimeLabel.appendChild(initialTimeInput);
+    form.appendChild(initialTimeLabel);
 
     // RADARSAT RCM 위성 기본값
     const RADARSAT_RCM: OrbitalElements = {
@@ -141,6 +182,9 @@ export class OrbitSettings {
 
     // 입력 필드에 change 이벤트 추가 (자동 업데이트)
     const inputFields = [
+      initialLatitudeInput.querySelector('input'),
+      initialLongitudeInput.querySelector('input'),
+      initialTimeInput,
       semiMajorAxisInput.querySelector('input'),
       eccentricityInput.querySelector('input'),
       inclinationInput.querySelector('input'),
@@ -291,11 +335,29 @@ export class OrbitSettings {
         elements.meanAnomaly = anomaly;
       }
 
+      // 초기 위치/시간 사용 여부: 세 값이 모두 유효하면 사용
+      const initialLatStr = (document.getElementById('prototypeOrbitInitialLatitude') as HTMLInputElement)?.value?.trim();
+      const initialLonStr = (document.getElementById('prototypeOrbitInitialLongitude') as HTMLInputElement)?.value?.trim();
+      const initialTimeStr = (document.getElementById('prototypeOrbitInitialTime') as HTMLInputElement)?.value?.trim();
+      const initialLat = initialLatStr !== undefined && initialLatStr !== '' ? parseFloat(initialLatStr) : NaN;
+      const initialLon = initialLonStr !== undefined && initialLonStr !== '' ? parseFloat(initialLonStr) : NaN;
+      const initialTimeValid = initialTimeStr !== undefined && initialTimeStr !== '' && !Number.isNaN(new Date(initialTimeStr).getTime());
+      const useInitialPosition = !Number.isNaN(initialLat) && !Number.isNaN(initialLon) && initialTimeValid;
+
+      let startTime: any;
+      if (useInitialPosition) {
+        startTime = Cesium.JulianDate.fromDate(new Date(initialTimeStr!));
+        const computedNu = computeInitialTrueAnomalyFromPosition(elements, initialLat, initialLon);
+        if (computedNu !== null) {
+          elements.trueAnomaly = computedNu;
+          delete elements.meanAnomaly;
+        }
+      } else {
+        startTime = this.viewer.clock.currentTime;
+      }
+
       // 기존 궤도 제거
       this.clearOrbit();
-
-      // 현재 시간을 시작 시간으로 사용
-      const startTime = this.viewer.clock.currentTime;
 
       console.log(`[OrbitSettings] 궤도 그리기 시작: ${durationHours.toFixed(2)}시간 (궤도 주기: ${orbitalPeriodHours.toFixed(2)}시간)`);
 

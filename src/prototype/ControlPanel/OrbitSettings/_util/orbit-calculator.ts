@@ -141,6 +141,54 @@ function calculatePositionFromOrbitalElements(
 }
 
 /**
+ * 목표 (lat, lon)에서 epoch 시 위성이 있도록 하는 진근점이각(deg)을 역산
+ * epoch 시 ECI=ECEF(회전 0)이므로, ECI 위치의 지리좌표가 (lon, lat)가 되는 ν를 탐색
+ * @param elements 궤도 6요소 (trueAnomaly/meanAnomaly는 무시, a,e,i,raan,argumentOfPerigee 사용)
+ * @param latitudeDeg 목표 위도 (deg)
+ * @param longitudeDeg 목표 경도 (deg)
+ * @returns 진근점이각 (deg), 해를 못 찾으면 null (호출부에서 폼 anomaly 사용)
+ */
+export function computeInitialTrueAnomalyFromPosition(
+  elements: OrbitalElements,
+  latitudeDeg: number,
+  longitudeDeg: number
+): number | null {
+  const targetLon = longitudeDeg;
+  const targetLat = latitudeDeg;
+
+  const steps = 360;
+  let bestNuDeg = 0;
+  let bestError = Infinity;
+
+  for (let k = 0; k < steps; k++) {
+    const nuRad = (k / steps) * 2 * Math.PI;
+    const nuDeg = Cesium.Math.toDegrees(nuRad);
+    const elementsWithNu: OrbitalElements = {
+      ...elements,
+      trueAnomaly: nuDeg,
+    };
+    const eci = calculatePositionFromOrbitalElements(elementsWithNu, 0);
+    const geodetic = eciToGeodetic(eci.x, eci.y, eci.z, new Cesium.JulianDate(), 0);
+
+    let lonDiff = geodetic.longitude - targetLon;
+    if (lonDiff > 180) lonDiff -= 360;
+    if (lonDiff < -180) lonDiff += 360;
+    const latDiff = geodetic.latitude - targetLat;
+    const error = lonDiff * lonDiff + latDiff * latDiff;
+    if (error < bestError) {
+      bestError = error;
+      bestNuDeg = nuDeg;
+    }
+  }
+
+  const thresholdDeg2 = 1;
+  if (bestError > thresholdDeg2) {
+    return null;
+  }
+  return bestNuDeg;
+}
+
+/**
  * ECI 좌표를 지리 좌표(위도, 경도, 고도)로 변환
  * Python 코드를 참고하여 지구 자전 각도를 직접 계산하는 방식 사용
  */

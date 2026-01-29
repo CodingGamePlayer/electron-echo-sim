@@ -48,6 +48,7 @@ declare namespace Cesium {
   
   namespace JulianDate {
     function now(): any;
+    function fromDate(date: Date, result?: any): any;
     function addMinutes(julianDate: any, minutes: number, result?: any): any;
     function addSeconds(julianDate: any, seconds: number, result?: any): any;
     function toDate(julianDate: any): Date;
