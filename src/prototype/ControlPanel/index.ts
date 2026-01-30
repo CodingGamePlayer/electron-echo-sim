@@ -114,7 +114,7 @@ export class ControlPanelManager {
     this.orbitSettings.initialize(orbitTabContent, viewer);
 
     this.targetSettings = new TargetSettings();
-    this.targetSettings.initialize(targetTabContent);
+    this.targetSettings.initialize(targetTabContent, viewer);
 
     // 탭 전환 이벤트 설정
     this.setupTabEvents();
