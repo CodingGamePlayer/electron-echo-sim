@@ -11,6 +11,32 @@ export interface LonLat {
 }
 
 /**
+ * 그리드 기하학적 중심의 WGS84 (lon, lat).
+ * 오프셋/스페이싱을 반영해 실제 그려지는 폴리곤 중심과 일치.
+ */
+export function computeGridCenterLonLat(
+  center_lon_deg: number,
+  center_lat_deg: number,
+  heading_deg: number,
+  range_params: SarRangeParams,
+  azimuth_params: SarAzimuthParams
+): LonLat {
+  const along_center_km =
+    azimuth_params.offset_km +
+    ((azimuth_params.count - 1) * azimuth_params.spacing_km) / 2;
+  const cross_center_km =
+    range_params.offset_km +
+    ((range_params.count - 1) * range_params.spacing_km) / 2;
+  return offsetKmToLonLat(
+    center_lon_deg,
+    center_lat_deg,
+    heading_deg,
+    along_center_km,
+    cross_center_km
+  );
+}
+
+/**
  * 그리드 4꼭짓점 (폴리곤용) WGS84 [lon, lat] 반환.
  * 순서: (azimuth_min, range_min) -> (azimuth_max, range_min) -> (azimuth_max, range_max) -> (azimuth_min, range_max)
  */
@@ -89,7 +115,24 @@ export function computeAllGridPointsLonLat(
 /**
  * 중심점(경위도) + 방위각(0=북, 90=동) + along_km/cross_km -> WGS84 (lon, lat)
  * ENU: along = 방위각 방향, cross = 오른쪽 90°
+ * 방향선(along-track / cross-track) 끝점 계산용으로 export.
  */
+export function alongCrossKmToLonLat(
+  center_lon_deg: number,
+  center_lat_deg: number,
+  heading_deg: number,
+  along_km: number,
+  cross_km: number
+): LonLat {
+  return offsetKmToLonLat(
+    center_lon_deg,
+    center_lat_deg,
+    heading_deg,
+    along_km,
+    cross_km
+  );
+}
+
 function offsetKmToLonLat(
   center_lon_deg: number,
   center_lat_deg: number,

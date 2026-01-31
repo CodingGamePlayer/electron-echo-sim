@@ -5,6 +5,7 @@ import {
 } from './_util/sar-target-calculator.js';
 import {
   computeGridCornersLonLat,
+  computeGridCenterLonLat,
   computeAllGridPointsLonLat,
 } from './_util/sar-grid-to-cesium.js';
 
@@ -16,6 +17,7 @@ export class TargetSettings {
   private viewer: any;
   private target_footprint_entity: any;
   private grid_point_entities: any[];
+  private direction_entities: any[];
   private update_debounce_timer: number | null;
 
   constructor() {
@@ -23,6 +25,7 @@ export class TargetSettings {
     this.viewer = null;
     this.target_footprint_entity = null;
     this.grid_point_entities = [];
+    this.direction_entities = [];
     this.update_debounce_timer = null;
   }
 
@@ -301,8 +304,24 @@ export class TargetSettings {
     const positions = corners.map((c) =>
       Cesium.Cartesian3.fromDegrees(c.longitude_deg, c.latitude_deg, 0)
     );
+    const center_alt = parseFloat(
+      (document.getElementById('prototypeTargetAltitude') as HTMLInputElement)?.value || '0'
+    );
+    const grid_center = computeGridCenterLonLat(
+      center_lon,
+      center_lat,
+      heading_deg,
+      range_params,
+      azimuth_params
+    );
+    // 폴리곤 엔티티에 position을 주면 이 엔티티로 카메라 추적(trackedEntity) 가능
     this.target_footprint_entity = this.viewer.entities.add({
       name: 'SAR 타겟 영역',
+      position: Cesium.Cartesian3.fromDegrees(
+        grid_center.longitude_deg,
+        grid_center.latitude_deg,
+        center_alt
+      ),
       polygon: {
         hierarchy: new Cesium.PolygonHierarchy(positions),
         material: Cesium.Color.CYAN.withAlpha(0.25),
@@ -338,11 +357,97 @@ export class TargetSettings {
       });
       this.grid_point_entities.push(entity);
     }
+
+    // Along-track / Cross-track 방향선 — 폴리곤 모서리(가장자리)에 배치
+    // corners 순서: [0]=(az_min,r_min), [1]=(az_max,r_min), [2]=(az_max,r_max), [3]=(az_min,r_max)
+    const c0 = corners[0];
+    const c1 = corners[1];
+    const c3 = corners[3];
+
+    const along_line = this.viewer.entities.add({
+      name: 'Along-track',
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+          c0.longitude_deg,
+          c0.latitude_deg,
+          center_alt,
+          c1.longitude_deg,
+          c1.latitude_deg,
+          center_alt,
+        ]),
+        width: 3,
+        material: Cesium.Color.YELLOW,
+        clampToGround: true,
+      },
+    });
+    this.direction_entities.push(along_line);
+
+    const cross_line = this.viewer.entities.add({
+      name: 'Cross-track',
+      polyline: {
+        positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+          c0.longitude_deg,
+          c0.latitude_deg,
+          center_alt,
+          c3.longitude_deg,
+          c3.latitude_deg,
+          center_alt,
+        ]),
+        width: 3,
+        material: Cesium.Color.ORANGE,
+        clampToGround: true,
+      },
+    });
+    this.direction_entities.push(cross_line);
+
+    // 방향선 끝(모서리 방향)에 레이블 배치
+    const along_label = this.viewer.entities.add({
+      name: 'Along-track label',
+      position: Cesium.Cartesian3.fromDegrees(
+        c1.longitude_deg,
+        c1.latitude_deg,
+        center_alt
+      ),
+      label: {
+        text: 'Along-track',
+        font: '14px sans-serif',
+        fillColor: Cesium.Color.YELLOW,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.MIDDLE,
+        pixelOffset: new Cesium.Cartesian2(8, 0),
+      },
+    });
+    this.direction_entities.push(along_label);
+
+    const cross_label = this.viewer.entities.add({
+      name: 'Cross-track label',
+      position: Cesium.Cartesian3.fromDegrees(
+        c3.longitude_deg,
+        c3.latitude_deg,
+        center_alt
+      ),
+      label: {
+        text: 'Cross-track',
+        font: '14px sans-serif',
+        fillColor: Cesium.Color.ORANGE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        verticalOrigin: Cesium.VerticalOrigin.MIDDLE,
+        pixelOffset: new Cesium.Cartesian2(8, 0),
+      },
+    });
+    this.direction_entities.push(cross_label);
   }
 
   private clearTargetEntities(): void {
     if (this.viewer) {
       if (this.target_footprint_entity) {
+        if (this.viewer.trackedEntity === this.target_footprint_entity) {
+          this.viewer.trackedEntity = undefined;
+        }
         this.viewer.entities.remove(this.target_footprint_entity);
         this.target_footprint_entity = null;
       }
@@ -350,6 +455,43 @@ export class TargetSettings {
         this.viewer.entities.remove(entity);
       }
       this.grid_point_entities.length = 0;
+      for (const entity of this.direction_entities) {
+        this.viewer.entities.remove(entity);
+      }
+      this.direction_entities.length = 0;
+    }
+  }
+
+  /**
+   * 타겟 위치로 카메라 이동 (타겟 설정 탭 진입 시 호출)
+   */
+  flyToTarget(): void {
+    if (!this.viewer) return;
+    try {
+      // 타겟 엔티티가 없으면 먼저 그리기 (중심 엔티티 포함)
+      this.drawTargetFootprint();
+
+      if (this.viewer.camera._flight && this.viewer.camera._flight.isActive()) {
+        this.viewer.camera.cancelFlight();
+      }
+      this.viewer.trackedEntity = undefined;
+
+      // 폴리곤 엔티티의 position(그리드 중심)으로 비행 후 같은 엔티티에 카메라 고정
+      if (this.target_footprint_entity) {
+        const pos = this.target_footprint_entity.position.getValue(Cesium.JulianDate.now());
+        if (pos) {
+          const radius = 80000; // 80km — 타겟 영역이 보이도록
+          const boundingSphere = new Cesium.BoundingSphere(pos, radius);
+          this.viewer.camera.flyToBoundingSphere(boundingSphere, {
+            duration: 1.5,
+            complete: () => {
+              this.viewer.trackedEntity = this.target_footprint_entity;
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[TargetSettings] 타겟으로 카메라 이동 오류:', error);
     }
   }
 

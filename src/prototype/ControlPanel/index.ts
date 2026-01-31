@@ -160,6 +160,14 @@ export class ControlPanelManager {
           }
           this.flyToEarth();
         }
+
+        // 타겟 설정 탭 클릭 시 해당 타겟으로 카메라 이동
+        if (targetTab === 'target' && this.targetSettings) {
+          if (this.satelliteSettings) {
+            this.satelliteSettings.cancelCameraAnimation();
+          }
+          this.targetSettings.flyToTarget();
+        }
       });
     });
   }
