@@ -1,6 +1,11 @@
 import { SatelliteSettings } from './SatelliteSettings/index.js';
 import { OrbitSettings } from './OrbitSettings/index.js';
-import { TargetSettings } from './TargetSettings/index.js';
+import { TargetSettings, type TargetSettingsOptions } from './TargetSettings/index.js';
+
+export interface ControlPanelOptions {
+  onRegionInfoFetched?: (data: import('./TargetSettings/index.js').RegionInfo) => void;
+  regionInfoPanel?: HTMLElement | null;
+}
 
 /**
  * ControlPanelManager - Prototype 제어 패널 관리자
@@ -12,6 +17,7 @@ export class ControlPanelManager {
   private orbitSettings: OrbitSettings | null;
   private targetSettings: TargetSettings | null;
   private viewer: any;
+  private regionInfoPanel: HTMLElement | null;
 
   constructor() {
     this.sidebar = null;
@@ -20,20 +26,22 @@ export class ControlPanelManager {
     this.orbitSettings = null;
     this.targetSettings = null;
     this.viewer = null;
+    this.regionInfoPanel = null;
   }
 
   /**
    * 제어 패널 초기화
    */
-  initialize(viewer?: any): void {
-    this.createControlPanel(viewer);
+  initialize(viewer?: any, options?: ControlPanelOptions): void {
+    this.regionInfoPanel = options?.regionInfoPanel ?? null;
+    this.createControlPanel(viewer, options);
     this.setupStyles();
   }
 
   /**
    * 제어 패널 생성
    */
-  private createControlPanel(viewer?: any): void {
+  private createControlPanel(viewer?: any, options?: ControlPanelOptions): void {
     this.viewer = viewer || null;
     // 기존 사이드바 확인
     this.sidebar = document.getElementById('sidebar');
@@ -113,8 +121,11 @@ export class ControlPanelManager {
     this.orbitSettings = new OrbitSettings();
     this.orbitSettings.initialize(orbitTabContent, viewer);
 
+    const targetOptions: TargetSettingsOptions = {
+      onRegionInfoFetched: options?.onRegionInfoFetched ?? undefined,
+    };
     this.targetSettings = new TargetSettings();
-    this.targetSettings.initialize(targetTabContent, viewer);
+    this.targetSettings.initialize(targetTabContent, viewer, targetOptions);
 
     // 탭 전환 이벤트 설정
     this.setupTabEvents();
@@ -161,12 +172,21 @@ export class ControlPanelManager {
           this.flyToEarth();
         }
 
-        // 타겟 설정 탭 클릭 시 해당 타겟으로 카메라 이동
+        // 타겟 설정 탭 클릭 시 해당 타겟으로 카메라 이동 + 우측 지역 정보 패널 표시 + 지역 정보 자동 수집
         if (targetTab === 'target' && this.targetSettings) {
           if (this.satelliteSettings) {
             this.satelliteSettings.cancelCameraAnimation();
           }
           this.targetSettings.flyToTarget();
+          if (this.regionInfoPanel) {
+            this.regionInfoPanel.classList.remove('hidden');
+          }
+          this.targetSettings.fetchRegionInfo();
+        } else {
+          // 다른 탭으로 전환 시 우측 지역 정보 패널 숨김
+          if (this.regionInfoPanel) {
+            this.regionInfoPanel.classList.add('hidden');
+          }
         }
       });
     });

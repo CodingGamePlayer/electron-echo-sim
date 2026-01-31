@@ -8,6 +8,47 @@ import {
   computeGridCenterLonLat,
   computeAllGridPointsLonLat,
 } from './_util/sar-grid-to-cesium.js';
+import { fetchBuildingsFromOverpass } from './_util/overpass-buildings.js';
+import { addTerrainElevationToBuildings } from './_util/sar-region-payload.js';
+
+/** DEM 격자 한 점 (SAR 지오코딩용) */
+export interface ElevationGridPoint {
+  longitude_deg: number;
+  latitude_deg: number;
+  height_m: number;
+}
+
+/** 3D Tiles/OSM 건물 피처 한 건 (위치 + 속성, 지면 고도 보정 시 ground_elevation_m 사용) */
+export interface BuildingFeature {
+  longitude_deg: number;
+  latitude_deg: number;
+  height_m: number;
+  properties: Record<string, unknown>;
+  /** DEM 격자로 보정한 지면 고도(m). 없으면 location.elevation에 height_m 사용 */
+  ground_elevation_m?: number;
+}
+
+/** 우측 패널에 전달하는 지역 정보 */
+export interface RegionInfo {
+  bounds: { lonMin: number; lonMax: number; latMin: number; latMax: number };
+  areaKm2: number;
+  elevation: { min: number; max: number; mean: number } | null;
+  sampleCount: number;
+  /** 타겟 격자와 동일 순서 (range 우선, azimuth) */
+  elevationGrid: ElevationGridPoint[];
+  rangeCount: number;
+  azimuthCount: number;
+  /** 타겟 bounds 내 3D Tiles/OSM 건물 피처 */
+  buildings: BuildingFeature[];
+  /** 지역 이름 (payload metadata.region용) */
+  regionName?: string;
+  /** 건물 데이터 출처 (payload buildings[].source용) */
+  buildingsSource?: 'OpenStreetMap Overpass API' | 'Cesium OSM Buildings';
+}
+
+export interface TargetSettingsOptions {
+  onRegionInfoFetched?: (data: RegionInfo) => void;
+}
 
 /**
  * TargetSettings - Target settings tab management class
@@ -19,6 +60,8 @@ export class TargetSettings {
   private grid_point_entities: any[];
   private direction_entities: any[];
   private update_debounce_timer: number | null;
+  private on_region_info_fetched: ((data: RegionInfo) => void) | null;
+  private fetch_region_info_button: HTMLButtonElement | null;
 
   constructor() {
     this.container = null;
@@ -27,14 +70,17 @@ export class TargetSettings {
     this.grid_point_entities = [];
     this.direction_entities = [];
     this.update_debounce_timer = null;
+    this.on_region_info_fetched = null;
+    this.fetch_region_info_button = null;
   }
 
   /**
    * Initialize target settings tab
    */
-  initialize(container: HTMLElement, viewer?: any): void {
+  initialize(container: HTMLElement, viewer?: any, options?: TargetSettingsOptions): void {
     this.container = container;
     this.viewer = viewer || null;
+    this.on_region_info_fetched = options?.onRegionInfoFetched ?? null;
     this.render();
     if (this.viewer) {
       this.updateTargetDebounced();
@@ -85,7 +131,7 @@ export class TargetSettings {
     const longitudeInput = document.createElement('input');
     longitudeInput.type = 'number';
     longitudeInput.id = 'prototypeTargetLongitude';
-    longitudeInput.value = '128.0';
+    longitudeInput.value = '127.0';
     longitudeInput.min = '-180';
     longitudeInput.max = '180';
     longitudeInput.step = '0.0001';
@@ -102,7 +148,7 @@ export class TargetSettings {
     const latitudeInput = document.createElement('input');
     latitudeInput.type = 'number';
     latitudeInput.id = 'prototypeTargetLatitude';
-    latitudeInput.value = '37.0';
+    latitudeInput.value = '37.5';
     latitudeInput.min = '-90';
     latitudeInput.max = '90';
     latitudeInput.step = '0.0001';
@@ -159,7 +205,7 @@ export class TargetSettings {
     range_title.style.color = '#aaa';
     sar_section.appendChild(range_title);
     this.createInputField(sar_section, 'Range Count:', 'prototypeTargetRangeCount', '8', '1', '10000', '1');
-    this.createInputField(sar_section, 'Range Spacing (km):', 'prototypeTargetRangeSpacing', '5', '0', '1000', '0.1');
+    this.createInputField(sar_section, 'Range Spacing (km):', 'prototypeTargetRangeSpacing', '1.5', '0', '1000', '0.1');
     this.createInputField(sar_section, 'Range Offset (km):', 'prototypeTargetRangeOffset', '30', '-1000', '1000', '0.1');
 
     // Azimuth
@@ -170,7 +216,7 @@ export class TargetSettings {
     azimuth_title.style.color = '#aaa';
     sar_section.appendChild(azimuth_title);
     this.createInputField(sar_section, 'Azimuth Count:', 'prototypeTargetAzimuthCount', '9', '1', '10000', '1');
-    this.createInputField(sar_section, 'Azimuth Spacing (km):', 'prototypeTargetAzimuthSpacing', '10', '0', '1000', '0.1');
+    this.createInputField(sar_section, 'Azimuth Spacing (km):', 'prototypeTargetAzimuthSpacing', '1.5', '0', '1000', '0.1');
     this.createInputField(sar_section, 'Azimuth Offset (km):', 'prototypeTargetAzimuthOffset', '-40', '-1000', '1000', '0.1');
 
     // 요약 (읽기 전용)
@@ -187,6 +233,24 @@ export class TargetSettings {
     summary_div.style.marginTop = '6px';
     summary_div.style.whiteSpace = 'pre-wrap';
     sar_section.appendChild(summary_div);
+
+    // 지역 정보 가져오기 버튼
+    const region_info_section = document.createElement('div');
+    region_info_section.style.marginTop = '20px';
+    region_info_section.style.paddingTop = '15px';
+    region_info_section.style.borderTop = '1px solid #333';
+    const region_info_btn = document.createElement('button');
+    region_info_btn.type = 'button';
+    region_info_btn.id = 'prototypeFetchRegionInfo';
+    region_info_btn.textContent = '지역 정보 가져오기';
+    region_info_btn.className = 'sidebar-section button';
+    region_info_btn.style.width = '100%';
+    region_info_btn.style.marginTop = '8px';
+    region_info_section.appendChild(region_info_btn);
+    form.appendChild(region_info_section);
+    this.fetch_region_info_button = region_info_btn;
+
+    region_info_btn.addEventListener('click', () => this.fetchRegionInfo());
 
     section.appendChild(form);
     this.container.appendChild(section);
@@ -252,12 +316,12 @@ export class TargetSettings {
     if (!summary_el) return;
     const range_params: SarRangeParams = {
       count: parseInt((document.getElementById('prototypeTargetRangeCount') as HTMLInputElement)?.value || '8', 10),
-      spacing_km: parseFloat((document.getElementById('prototypeTargetRangeSpacing') as HTMLInputElement)?.value || '5'),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetRangeSpacing') as HTMLInputElement)?.value || '1.5'),
       offset_km: parseFloat((document.getElementById('prototypeTargetRangeOffset') as HTMLInputElement)?.value || '30'),
     };
     const azimuth_params: SarAzimuthParams = {
       count: parseInt((document.getElementById('prototypeTargetAzimuthCount') as HTMLInputElement)?.value || '9', 10),
-      spacing_km: parseFloat((document.getElementById('prototypeTargetAzimuthSpacing') as HTMLInputElement)?.value || '10'),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetAzimuthSpacing') as HTMLInputElement)?.value || '1.5'),
       offset_km: parseFloat((document.getElementById('prototypeTargetAzimuthOffset') as HTMLInputElement)?.value || '-40'),
     };
     const summary = computeSarSummary(range_params, azimuth_params);
@@ -281,17 +345,17 @@ export class TargetSettings {
   private drawTargetFootprint(): void {
     if (!this.viewer) return;
     this.clearTargetEntities();
-    const center_lon = parseFloat((document.getElementById('prototypeTargetLongitude') as HTMLInputElement)?.value || '128');
-    const center_lat = parseFloat((document.getElementById('prototypeTargetLatitude') as HTMLInputElement)?.value || '37');
+    const center_lon = parseFloat((document.getElementById('prototypeTargetLongitude') as HTMLInputElement)?.value || '127');
+    const center_lat = parseFloat((document.getElementById('prototypeTargetLatitude') as HTMLInputElement)?.value || '37.5');
     const heading_deg = parseFloat((document.getElementById('prototypeTargetAlongTrackHeading') as HTMLInputElement)?.value || '90');
     const range_params: SarRangeParams = {
       count: parseInt((document.getElementById('prototypeTargetRangeCount') as HTMLInputElement)?.value || '8', 10),
-      spacing_km: parseFloat((document.getElementById('prototypeTargetRangeSpacing') as HTMLInputElement)?.value || '5'),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetRangeSpacing') as HTMLInputElement)?.value || '1.5'),
       offset_km: parseFloat((document.getElementById('prototypeTargetRangeOffset') as HTMLInputElement)?.value || '30'),
     };
     const azimuth_params: SarAzimuthParams = {
       count: parseInt((document.getElementById('prototypeTargetAzimuthCount') as HTMLInputElement)?.value || '9', 10),
-      spacing_km: parseFloat((document.getElementById('prototypeTargetAzimuthSpacing') as HTMLInputElement)?.value || '10'),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetAzimuthSpacing') as HTMLInputElement)?.value || '1.5'),
       offset_km: parseFloat((document.getElementById('prototypeTargetAzimuthOffset') as HTMLInputElement)?.value || '-40'),
     };
     const corners = computeGridCornersLonLat(
@@ -314,7 +378,6 @@ export class TargetSettings {
       range_params,
       azimuth_params
     );
-    // 폴리곤 엔티티에 position을 주면 이 엔티티로 카메라 추적(trackedEntity) 가능
     this.target_footprint_entity = this.viewer.entities.add({
       name: 'SAR 타겟 영역',
       position: Cesium.Cartesian3.fromDegrees(
@@ -463,6 +526,205 @@ export class TargetSettings {
   }
 
   /**
+   * 타겟 폴리곤 범위 내 지역 정보(경계·면적·고도)를 Cesium terrain으로 가져와 콜백 호출
+   */
+  async fetchRegionInfo(): Promise<void> {
+    if (!this.viewer || !this.on_region_info_fetched) return;
+    const btn = this.fetch_region_info_button;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '가져오는 중…';
+    }
+    const center_lon = parseFloat(
+      (document.getElementById('prototypeTargetLongitude') as HTMLInputElement)?.value || '127'
+    );
+    const center_lat = parseFloat(
+      (document.getElementById('prototypeTargetLatitude') as HTMLInputElement)?.value || '37.5'
+    );
+    const heading_deg = parseFloat(
+      (document.getElementById('prototypeTargetAlongTrackHeading') as HTMLInputElement)?.value || '90'
+    );
+    const range_params: SarRangeParams = {
+      count: parseInt((document.getElementById('prototypeTargetRangeCount') as HTMLInputElement)?.value || '8', 10),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetRangeSpacing') as HTMLInputElement)?.value || '1.5'),
+      offset_km: parseFloat((document.getElementById('prototypeTargetRangeOffset') as HTMLInputElement)?.value || '30'),
+    };
+    const azimuth_params: SarAzimuthParams = {
+      count: parseInt((document.getElementById('prototypeTargetAzimuthCount') as HTMLInputElement)?.value || '9', 10),
+      spacing_km: parseFloat((document.getElementById('prototypeTargetAzimuthSpacing') as HTMLInputElement)?.value || '1.5'),
+      offset_km: parseFloat((document.getElementById('prototypeTargetAzimuthOffset') as HTMLInputElement)?.value || '-40'),
+    };
+    const grid_points = computeAllGridPointsLonLat(
+      center_lon,
+      center_lat,
+      heading_deg,
+      range_params,
+      azimuth_params
+    );
+    const corners = computeGridCornersLonLat(
+      center_lon,
+      center_lat,
+      heading_deg,
+      range_params,
+      azimuth_params
+    );
+    const summary = computeSarSummary(range_params, azimuth_params);
+    const bounds = {
+      lonMin: Math.min(...corners.map((c) => c.longitude_deg)),
+      lonMax: Math.max(...corners.map((c) => c.longitude_deg)),
+      latMin: Math.min(...corners.map((c) => c.latitude_deg)),
+      latMax: Math.max(...corners.map((c) => c.latitude_deg)),
+    };
+    const areaKm2 = summary.total_area_km2;
+    const rangeCount = range_params.count;
+    const azimuthCount = azimuth_params.count;
+    const cartographics = grid_points.map((c) =>
+      Cesium.Cartographic.fromDegrees(c.longitude_deg, c.latitude_deg, 0)
+    );
+    let elevation: { min: number; max: number; mean: number } | null = null;
+    const elevationGrid: ElevationGridPoint[] = [];
+    try {
+      const provider = this.viewer.terrainProvider;
+      const sampled = await Cesium.sampleTerrainMostDetailed(provider, cartographics);
+      for (let i = 0; i < grid_points.length; i++) {
+        const p = grid_points[i];
+        const h = sampled[i]?.height;
+        const height_m = typeof h === 'number' ? h : 0;
+        elevationGrid.push({
+          longitude_deg: p.longitude_deg,
+          latitude_deg: p.latitude_deg,
+          height_m,
+        });
+      }
+      const heights = elevationGrid.map((e) => e.height_m).filter((h) => h !== undefined);
+      if (heights.length > 0) {
+        const min = Math.min(...heights);
+        const max = Math.max(...heights);
+        const mean = heights.reduce((a, b) => a + b, 0) / heights.length;
+        elevation = { min, max, mean };
+      }
+    } catch (err) {
+      console.warn('[TargetSettings] 지형 고도 샘플 실패, 경계/면적만 전달:', err);
+      for (const p of grid_points) {
+        elevationGrid.push({
+          longitude_deg: p.longitude_deg,
+          latitude_deg: p.latitude_deg,
+          height_m: 0,
+        });
+      }
+    }
+
+    let buildings = await fetchBuildingsFromOverpass(bounds);
+    let buildingsSource: 'OpenStreetMap Overpass API' | 'Cesium OSM Buildings' =
+      'OpenStreetMap Overpass API';
+    if (buildings.length === 0) {
+      buildings = this.collectBuildingsInBounds(bounds);
+      buildingsSource = 'Cesium OSM Buildings';
+    }
+    if (elevationGrid.length > 0) {
+      addTerrainElevationToBuildings(buildings, elevationGrid);
+    }
+
+    const regionInfo: RegionInfo = {
+      bounds,
+      areaKm2,
+      elevation,
+      sampleCount: elevationGrid.length,
+      elevationGrid,
+      rangeCount,
+      azimuthCount,
+      buildings,
+      regionName: 'Seoul Target',
+      buildingsSource,
+    };
+    this.on_region_info_fetched(regionInfo);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '지역 정보 가져오기';
+    }
+  }
+
+  /**
+   * 타겟 bounds 내 로드된 3D Tiles 건물 피처 수집 (타일 중심 + batch table 속성)
+   */
+  private collectBuildingsInBounds(bounds: {
+    lonMin: number;
+    lonMax: number;
+    latMin: number;
+    latMax: number;
+  }): BuildingFeature[] {
+    const result: BuildingFeature[] = [];
+    if (!this.viewer || !this.viewer.scene) return result;
+    const ellipsoid = this.viewer.scene.globe.ellipsoid;
+    const scratchCartographic = new Cesium.Cartographic();
+
+    const inBounds = (lon: number, lat: number): boolean =>
+      lon >= bounds.lonMin && lon <= bounds.lonMax && lat >= bounds.latMin && lat <= bounds.latMax;
+
+    const visitTile = (tile: any): void => {
+      if (!tile) return;
+      try {
+        const content = tile.content;
+        if (content && content.featuresLength > 0) {
+          const sphere = tile.boundingSphere;
+          if (sphere && sphere.center) {
+            const carto = Cesium.Cartographic.fromCartesian(
+              sphere.center,
+              ellipsoid,
+              scratchCartographic
+            );
+            const lonDeg = Cesium.Math.toDegrees(carto.longitude);
+            const latDeg = Cesium.Math.toDegrees(carto.latitude);
+            const height_m = carto.height ?? 0;
+            if (inBounds(lonDeg, latDeg)) {
+              for (let i = 0; i < content.featuresLength; i++) {
+                try {
+                  const feature = content.getFeature(i);
+                  if (!feature) continue;
+                  const ids = feature.getPropertyIds ? feature.getPropertyIds() : [];
+                  const properties: Record<string, unknown> = {};
+                  for (const id of ids) {
+                    try {
+                      properties[id] = feature.getProperty(id);
+                    } catch {
+                      // skip single property
+                    }
+                  }
+                  result.push({
+                    longitude_deg: lonDeg,
+                    latitude_deg: latDeg,
+                    height_m,
+                    properties,
+                  });
+                } catch {
+                  // skip single feature
+                }
+              }
+            }
+          }
+        }
+        const children = tile.children;
+        if (children && children.length > 0) {
+          for (let c = 0; c < children.length; c++) {
+            visitTile(children[c]);
+          }
+        }
+      } catch {
+        // skip tile
+      }
+    };
+
+    const primitives = this.viewer.scene.primitives;
+    for (let i = 0; i < primitives.length; i++) {
+      const p = primitives.get(i);
+      if (p && p instanceof Cesium.Cesium3DTileset && p.root) {
+        visitTile(p.root);
+      }
+    }
+    return result;
+  }
+
+  /**
    * 타겟 위치로 카메라 이동 (타겟 설정 탭 진입 시 호출)
    */
   flyToTarget(): void {
@@ -476,18 +738,13 @@ export class TargetSettings {
       }
       this.viewer.trackedEntity = undefined;
 
-      // 폴리곤 엔티티의 position(그리드 중심)으로 비행 후 같은 엔티티에 카메라 고정
+      // 폴리곤 엔티티의 position(그리드 중심)으로만 비행 (카메라 고정 없음)
       if (this.target_footprint_entity) {
         const pos = this.target_footprint_entity.position.getValue(Cesium.JulianDate.now());
         if (pos) {
           const radius = 80000; // 80km — 타겟 영역이 보이도록
           const boundingSphere = new Cesium.BoundingSphere(pos, radius);
-          this.viewer.camera.flyToBoundingSphere(boundingSphere, {
-            duration: 1.5,
-            complete: () => {
-              this.viewer.trackedEntity = this.target_footprint_entity;
-            },
-          });
+          this.viewer.camera.flyToBoundingSphere(boundingSphere, { duration: 1.5 });
         }
       }
     } catch (error) {
@@ -504,6 +761,8 @@ export class TargetSettings {
       this.update_debounce_timer = null;
     }
     this.clearTargetEntities();
+    this.fetch_region_info_button = null;
+    this.on_region_info_fetched = null;
     if (this.container) {
       this.container.innerHTML = '';
     }
